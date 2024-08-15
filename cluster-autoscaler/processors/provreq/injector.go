@@ -35,7 +35,8 @@ import (
 )
 
 const (
-	defaultRetryTime = 10 * time.Minute
+	defaultRetryTime            = 10 * time.Minute
+	ProvisioningRequestsPerLoop = 10
 )
 
 // ProvisioningRequestPodsInjector creates in-memory pods from ProvisioningRequest and inject them to unscheduled pods list.
@@ -53,6 +54,9 @@ func (p *ProvisioningRequestPodsInjector) Process(
 	if err != nil {
 		return nil, err
 	}
+
+	provisionRequestsInjected := 0
+
 	for _, pr := range provReqs {
 		if ok, found := provisioningrequest.SupportedProvisioningClasses[pr.Spec.ProvisioningClassName]; !ok || !found {
 			klog.Warningf("Provisioning Class %s is not supported", pr.Spec.ProvisioningClassName)
@@ -91,7 +95,10 @@ func (p *ProvisioningRequestPodsInjector) Process(
 				continue
 			}
 			unschedulablePods := append(unschedulablePods, provreqpods...)
-			return unschedulablePods, nil
+			provisionRequestsInjected++
+			if provisionRequestsInjected >= ProvisioningRequestsPerLoop {
+				return unschedulablePods, nil
+			}
 		}
 	}
 	return unschedulablePods, nil

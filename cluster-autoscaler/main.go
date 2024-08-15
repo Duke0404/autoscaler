@@ -264,9 +264,9 @@ var (
 			"--max-graceful-termination-sec flag should not be set when this flag is set. Not setting this flag will use unordered evictor by default."+
 			"Priority evictor reuses the concepts of drain logic in kubelet(https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2712-pod-priority-based-graceful-node-shutdown#migration-from-the-node-graceful-shutdown-feature)."+
 			"Eg. flag usage:  '10000:20,1000:100,0:60'")
-	provisioningRequestsEnabled = flag.Bool("enable-provisioning-requests", false, "Whether the clusterautoscaler will be handling the ProvisioningRequest CRs.")
-	frequentLoopsEnabled        = flag.Bool("frequent-loops-enabled", false, "Whether clusterautoscaler triggers new iterations more frequently when it's needed")
-	provisioningRequestsPerLoop= flag.Int("provisioning-requests-per-loop", 10, "Maximum number of ProvisioningRequests to process in a single loop iteration")
+	provisioningRequestsEnabled               = flag.Bool("enable-provisioning-requests", false, "Whether the clusterautoscaler will be handling the ProvisioningRequest CRs.")
+	frequentLoopsEnabled                      = flag.Bool("frequent-loops-enabled", false, "Whether clusterautoscaler triggers new iterations more frequently when it's needed")
+	provisioningRequestsPerLoop               = flag.Int("provisioning-requests-per-loop", 10, "Maximum number of ProvisioningRequests to process in a single loop iteration")
 	provisioningrequestBatchProcessingTimebox = flag.Duration("provisioning-request-batch-processing-timebox", 10*time.Second, "Maximum time to process a batch of ProvisioningRequests")
 )
 
@@ -440,10 +440,10 @@ func createAutoscalingOptions() config.AutoscalingOptions {
 			MaxAllocatableDifferenceRatio:    *maxAllocatableDifferenceRatio,
 			MaxFreeDifferenceRatio:           *maxFreeDifferenceRatio,
 		},
-		DynamicNodeDeleteDelayAfterTaintEnabled: *dynamicNodeDeleteDelayAfterTaintEnabled,
-		BypassedSchedulers:                      scheduler_util.GetBypassedSchedulersMap(*bypassedSchedulers),
-		ProvisioningRequestEnabled:              *provisioningRequestsEnabled,
-		provisioningRequestsPerLoop:             *provisioningRequestsPerLoop,
+		DynamicNodeDeleteDelayAfterTaintEnabled:   *dynamicNodeDeleteDelayAfterTaintEnabled,
+		BypassedSchedulers:                        scheduler_util.GetBypassedSchedulersMap(*bypassedSchedulers),
+		ProvisioningRequestEnabled:                *provisioningRequestsEnabled,
+		provisioningRequestsPerLoop:               *provisioningRequestsPerLoop,
 		provisioningRequestBatchProcessingTimebox: *provisioningrequestBatchProcessingTimebox,
 	}
 }
