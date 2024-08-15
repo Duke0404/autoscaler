@@ -295,6 +295,10 @@ type AutoscalingOptions struct {
 	BypassedSchedulers map[string]bool
 	// ProvisioningRequestEnabled tells if CA processes ProvisioningRequest.
 	ProvisioningRequestEnabled bool
+	// provisioningRequestsPerLoop is the maximum number of ProvisioningRequests that CA processes in a single loop.
+	ProvisioningRequestsPerLoop int
+	// provisioningrequestBatchProcessingTimebox is the maximum time CA spends processing ProvisioningRequests in a single loop.
+	ProvisioningRequestBatchProcessingTimebox time.Duration
 }
 
 // KubeClientOptions specify options for kube client

@@ -266,6 +266,8 @@ var (
 			"Eg. flag usage:  '10000:20,1000:100,0:60'")
 	provisioningRequestsEnabled = flag.Bool("enable-provisioning-requests", false, "Whether the clusterautoscaler will be handling the ProvisioningRequest CRs.")
 	frequentLoopsEnabled        = flag.Bool("frequent-loops-enabled", false, "Whether clusterautoscaler triggers new iterations more frequently when it's needed")
+	provisioningRequestsPerLoop= flag.Int("provisioning-requests-per-loop", 10, "Maximum number of ProvisioningRequests to process in a single loop iteration")
+	provisioningrequestBatchProcessingTimebox = flag.Duration("provisioning-request-batch-processing-timebox", 10*time.Second, "Maximum time to process a batch of ProvisioningRequests")
 )
 
 func isFlagPassed(name string) bool {
@@ -441,6 +443,8 @@ func createAutoscalingOptions() config.AutoscalingOptions {
 		DynamicNodeDeleteDelayAfterTaintEnabled: *dynamicNodeDeleteDelayAfterTaintEnabled,
 		BypassedSchedulers:                      scheduler_util.GetBypassedSchedulersMap(*bypassedSchedulers),
 		ProvisioningRequestEnabled:              *provisioningRequestsEnabled,
+		provisioningRequestsPerLoop:             *provisioningRequestsPerLoop,
+		provisioningRequestBatchProcessingTimebox: *provisioningrequestBatchProcessingTimebox,
 	}
 }
 
