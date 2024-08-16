@@ -92,14 +92,29 @@ func (o *provReqOrchestrator) ScaleUp(
 	o.context.ClusterSnapshot.Fork()
 	defer o.context.ClusterSnapshot.Revert()
 
+	combinedStatus := &status.ScaleUpStatus{Result: status.ScaleUpNotTried}
+
 	// unschedulablePods pods should belong to one ProvisioningClass, so only one provClass should try to ScaleUp.
+	// for _, provClass := range o.provisioningClasses {
+	// 	st, err := provClass.Provision(unschedulablePods, nodes, daemonSets, nodeInfos)
+	// 	if err != nil || st != nil && st.Result != status.ScaleUpNotTried {
+	// 		return st, err
+	// 	}
+	// }
+	// return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
+
+	// unschedulablePods pods can belong to multiple ProvisioningClasses, so all provClasses should try to ScaleUp.
 	for _, provClass := range o.provisioningClasses {
 		st, err := provClass.Provision(unschedulablePods, nodes, daemonSets, nodeInfos)
-		if err != nil || st != nil && st.Result != status.ScaleUpNotTried {
-			return st, err
+		if err != nil {
+			return st, err // TODO: Ask if function should return if error occurred
+		}
+		if st != nil && st.Result == status.ScaleUpSuccessful {
+			combinedStatus = st
 		}
 	}
-	return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
+
+	return combinedStatus, nil // TODO: Refactor to return combined status. Maybe create new status which indicates partial success.
 }
 
 // ScaleUpToNodeGroupMinSize doesn't have implementation for ProvisioningRequest Orchestrator.

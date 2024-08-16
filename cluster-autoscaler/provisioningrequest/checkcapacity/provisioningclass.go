@@ -80,18 +80,32 @@ func (o *checkCapacityProvClass) Provision(
 		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
 	}
 	// Pick 1 ProvisioningRequest.
-	pr := prs[0]
-	o.context.ClusterSnapshot.Fork()
-	defer o.context.ClusterSnapshot.Revert()
+	// pr := prs[0]
+	// o.context.ClusterSnapshot.Fork()
+	// defer o.context.ClusterSnapshot.Revert()
 
-	scaleUpIsSuccessful, err := o.checkcapacity(unschedulablePods, pr)
-	if err != nil {
-		return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
+	// scaleUpIsSuccessful, err := o.checkcapacity(unschedulablePods, pr)
+	// if err != nil {
+	// 	return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
+	// }
+	// if scaleUpIsSuccessful {
+	// 	return &status.ScaleUpStatus{Result: status.ScaleUpSuccessful}, nil
+	// }
+	// return &status.ScaleUpStatus{Result: status.ScaleUpNoOptionsAvailable}, nil
+
+	combinedStatus := &status.ScaleUpStatus{Result: status.ScaleUpSuccessful}
+
+	// Process all pods from all provisioning requests.
+	for _, pr := range prs {
+		o.context.ClusterSnapshot.Fork()
+		defer o.context.ClusterSnapshot.Revert()
+		_, err := o.checkcapacity(unschedulablePods, pr)
+		if err != nil {
+			return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
+		}
 	}
-	if scaleUpIsSuccessful {
-		return &status.ScaleUpStatus{Result: status.ScaleUpSuccessful}, nil
-	}
-	return &status.ScaleUpStatus{Result: status.ScaleUpNoOptionsAvailable}, nil
+
+	return combinedStatus, nil
 }
 
 // Assuming that all unschedulable pods comes from one ProvisioningRequest.

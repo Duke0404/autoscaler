@@ -87,51 +87,100 @@ func (o *bestEffortAtomicProvClass) Provision(
 		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
 	}
 	// Pick 1 ProvisioningRequest.
-	pr := prs[0]
+	// pr := prs[0]
 
-	o.context.ClusterSnapshot.Fork()
-	defer o.context.ClusterSnapshot.Revert()
+	// o.context.ClusterSnapshot.Fork()
+	// defer o.context.ClusterSnapshot.Revert()
 
-	// For provisioning requests, unschedulablePods are actually all injected pods. Some may even be schedulable!
-	actuallyUnschedulablePods, err := o.filterOutSchedulable(unschedulablePods)
-	if err != nil {
-		conditions.AddOrUpdateCondition(pr, v1beta1.Provisioned, metav1.ConditionFalse, conditions.FailedToCheckCapacityReason, conditions.FailedToCheckCapacityMsg, metav1.Now())
-		if _, updateErr := o.client.UpdateProvisioningRequest(pr.ProvisioningRequest); updateErr != nil {
-			klog.Errorf("failed to add Provisioned=false condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
+	// // For provisioning requests, unschedulablePods are actually all injected pods. Some may even be schedulable!
+	// actuallyUnschedulablePods, err := o.filterOutSchedulable(unschedulablePods)
+	// if err != nil {
+	// 	conditions.AddOrUpdateCondition(pr, v1beta1.Provisioned, metav1.ConditionFalse, conditions.FailedToCheckCapacityReason, conditions.FailedToCheckCapacityMsg, metav1.Now())
+	// 	if _, updateErr := o.client.UpdateProvisioningRequest(pr.ProvisioningRequest); updateErr != nil {
+	// 		klog.Errorf("failed to add Provisioned=false condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
+	// 	}
+	// 	return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
+	// }
+
+	// if len(actuallyUnschedulablePods) == 0 {
+	// 	// Nothing to do here - everything fits without scale-up.
+	// 	conditions.AddOrUpdateCondition(pr, v1beta1.Provisioned, metav1.ConditionTrue, conditions.CapacityIsFoundReason, conditions.CapacityIsFoundMsg, metav1.Now())
+	// 	if _, updateErr := o.client.UpdateProvisioningRequest(pr.ProvisioningRequest); updateErr != nil {
+	// 		klog.Errorf("failed to add Provisioned=true condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
+	// 		return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "capacity available, but failed to admit workload: %s", updateErr.Error()))
+	// 	}
+	// 	return &status.ScaleUpStatus{Result: status.ScaleUpNotNeeded}, nil
+	// }
+
+	// st, err := o.scaleUpOrchestrator.ScaleUp(actuallyUnschedulablePods, nodes, daemonSets, nodeInfos, true)
+	// if err == nil && st.Result == status.ScaleUpSuccessful {
+	// 	// Happy path - all is well.
+	// 	conditions.AddOrUpdateCondition(pr, v1beta1.Provisioned, metav1.ConditionTrue, conditions.CapacityIsProvisionedReason, conditions.CapacityIsProvisionedMsg, metav1.Now())
+	// 	if _, updateErr := o.client.UpdateProvisioningRequest(pr.ProvisioningRequest); updateErr != nil {
+	// 		klog.Errorf("failed to add Provisioned=true condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
+	// 		return st, errors.NewAutoscalerError(errors.InternalError, "scale up requested, but failed to admit workload: %s", updateErr.Error())
+	// 	}
+	// 	return st, nil
+	// }
+
+	// // We are not happy with the results.
+	// conditions.AddOrUpdateCondition(pr, v1beta1.Provisioned, metav1.ConditionFalse, conditions.CapacityIsNotFoundReason, "Capacity is not found, CA will try to find it later.", metav1.Now())
+	// if _, updateErr := o.client.UpdateProvisioningRequest(pr.ProvisioningRequest); updateErr != nil {
+	// 	klog.Errorf("failed to add Provisioned=false condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
+	// }
+	// if err != nil {
+	// 	return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
+	// }
+	// return st, nil
+
+	combinedStatus := &status.ScaleUpStatus{Result: status.ScaleUpSuccessful}
+
+	// Process all pods from all provisioning requests.
+	for _, pr := range prs {
+		o.context.ClusterSnapshot.Fork()
+		defer o.context.ClusterSnapshot.Revert()
+		
+		// For provisioning requests, unschedulablePods are actually all injected pods. Some may even be schedulable!
+		actuallyUnschedulablePods, err := o.filterOutSchedulable(unschedulablePods)
+		if err != nil {
+			conditions.AddOrUpdateCondition(pr, v1beta1.Provisioned, metav1.ConditionFalse, conditions.FailedToCheckCapacityReason, conditions.FailedToCheckCapacityMsg, metav1.Now())
+			if _, updateErr := o.client.UpdateProvisioningRequest(pr.ProvisioningRequest); updateErr != nil {
+				klog.Errorf("failed to add Provisioned=false condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
+			}
+			return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
 		}
-		return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
-	}
 
-	if len(actuallyUnschedulablePods) == 0 {
-		// Nothing to do here - everything fits without scale-up.
-		conditions.AddOrUpdateCondition(pr, v1beta1.Provisioned, metav1.ConditionTrue, conditions.CapacityIsFoundReason, conditions.CapacityIsFoundMsg, metav1.Now())
-		if _, updateErr := o.client.UpdateProvisioningRequest(pr.ProvisioningRequest); updateErr != nil {
-			klog.Errorf("failed to add Provisioned=true condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
-			return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "capacity available, but failed to admit workload: %s", updateErr.Error()))
+		if len(actuallyUnschedulablePods) == 0 {
+			// Nothing to do here - everything fits without scale-up.
+			conditions.AddOrUpdateCondition(pr, v1beta1.Provisioned, metav1.ConditionTrue, conditions.CapacityIsFoundReason, conditions.CapacityIsFoundMsg, metav1.Now())
+			if _, updateErr := o.client.UpdateProvisioningRequest(pr.ProvisioningRequest); updateErr != nil {
+				klog.Errorf("failed to add Provisioned=true condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
+				return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "capacity available, but failed to admit workload: %s", updateErr.Error()))
+			}
+			continue
 		}
-		return &status.ScaleUpStatus{Result: status.ScaleUpNotNeeded}, nil
-	}
 
-	st, err := o.scaleUpOrchestrator.ScaleUp(actuallyUnschedulablePods, nodes, daemonSets, nodeInfos, true)
-	if err == nil && st.Result == status.ScaleUpSuccessful {
-		// Happy path - all is well.
-		conditions.AddOrUpdateCondition(pr, v1beta1.Provisioned, metav1.ConditionTrue, conditions.CapacityIsProvisionedReason, conditions.CapacityIsProvisionedMsg, metav1.Now())
-		if _, updateErr := o.client.UpdateProvisioningRequest(pr.ProvisioningRequest); updateErr != nil {
-			klog.Errorf("failed to add Provisioned=true condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
-			return st, errors.NewAutoscalerError(errors.InternalError, "scale up requested, but failed to admit workload: %s", updateErr.Error())
+		st, err := o.scaleUpOrchestrator.ScaleUp(actuallyUnschedulablePods, nodes, daemonSets, nodeInfos, true)
+		if err == nil && st.Result == status.ScaleUpSuccessful {
+			// Happy path - all is well.
+			conditions.AddOrUpdateCondition(pr, v1beta1.Provisioned, metav1.ConditionTrue, conditions.CapacityIsProvisionedReason, conditions.CapacityIsProvisionedMsg, metav1.Now())
+			if _, updateErr := o.client.UpdateProvisioningRequest(pr.ProvisioningRequest); updateErr != nil {
+				klog.Errorf("failed to add Provisioned=true condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
+				return st, errors.NewAutoscalerError(errors.InternalError, "scale up requested, but failed to admit workload: %s", updateErr.Error())
+			}
+		} else {
+			// We are not happy with the results.
+			conditions.AddOrUpdateCondition(pr, v1beta1.Provisioned, metav1.ConditionFalse, conditions.CapacityIsNotFoundReason, "Capacity is not found, CA will try to find it later.", metav1.Now())
+			if _, updateErr := o.client.UpdateProvisioningRequest(pr.ProvisioningRequest); updateErr != nil {
+				klog.Errorf("failed to add Provisioned=false condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
+			}
+			if err != nil {
+				return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
+			}
 		}
-		return st, nil
 	}
 
-	// We are not happy with the results.
-	conditions.AddOrUpdateCondition(pr, v1beta1.Provisioned, metav1.ConditionFalse, conditions.CapacityIsNotFoundReason, "Capacity is not found, CA will try to find it later.", metav1.Now())
-	if _, updateErr := o.client.UpdateProvisioningRequest(pr.ProvisioningRequest); updateErr != nil {
-		klog.Errorf("failed to add Provisioned=false condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
-	}
-	if err != nil {
-		return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
-	}
-	return st, nil
+	return combinedStatus, nil
 }
 
 func (o *bestEffortAtomicProvClass) filterOutSchedulable(pods []*apiv1.Pod) ([]*apiv1.Pod, error) {
