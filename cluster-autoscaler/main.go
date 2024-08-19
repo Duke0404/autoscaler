@@ -443,8 +443,8 @@ func createAutoscalingOptions() config.AutoscalingOptions {
 		DynamicNodeDeleteDelayAfterTaintEnabled:   *dynamicNodeDeleteDelayAfterTaintEnabled,
 		BypassedSchedulers:                        scheduler_util.GetBypassedSchedulersMap(*bypassedSchedulers),
 		ProvisioningRequestEnabled:                *provisioningRequestsEnabled,
-		// provisioningRequestsPerLoop:               *provisioningRequestsPerLoop,
-		// provisioningRequestBatchProcessingTimebox: *provisioningrequestBatchProcessingTimebox,
+		ProvisioningRequestsPerLoop:               *provisioningRequestsPerLoop,
+		ProvisioningRequestBatchProcessingTimebox: *provisioningrequestBatchProcessingTimebox,
 	}
 }
 

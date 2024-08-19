@@ -95,10 +95,13 @@ func (o *checkCapacityProvClass) Provision(
 
 	combinedStatus := &status.ScaleUpStatus{Result: status.ScaleUpSuccessful}
 
+	o.context.ClusterSnapshot.Fork()
+	defer o.context.ClusterSnapshot.Revert()
 	// Process all pods from all provisioning requests.
 	for _, pr := range prs {
 		o.context.ClusterSnapshot.Fork()
 		defer o.context.ClusterSnapshot.Revert()
+		
 		_, err := o.checkcapacity(unschedulablePods, pr)
 		if err != nil {
 			return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))

@@ -135,6 +135,9 @@ func (o *bestEffortAtomicProvClass) Provision(
 
 	combinedStatus := &status.ScaleUpStatus{Result: status.ScaleUpSuccessful}
 
+	o.context.ClusterSnapshot.Fork()
+	defer o.context.ClusterSnapshot.Revert()
+
 	// Process all pods from all provisioning requests.
 	for _, pr := range prs {
 		o.context.ClusterSnapshot.Fork()
@@ -178,6 +181,8 @@ func (o *bestEffortAtomicProvClass) Provision(
 				return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
 			}
 		}
+
+		// TODO: Add pods & nodes to snapshot if successful scaleup.
 	}
 
 	return combinedStatus, nil
