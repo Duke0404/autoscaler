@@ -107,6 +107,7 @@ func multiStringFlag(name string, usage string) *MultiStringFlag {
 }
 
 var (
+	resourceName            = flag.String("resource-name", "cluster-autoscaler", "The name of the cluster-autoscaler kubernetes resource")
 	clusterName             = flag.String("cluster-name", "", "Autoscaled cluster name, if available")
 	address                 = flag.String("address", ":8085", "The address to expose prometheus metrics.")
 	kubernetes              = flag.String("kubernetes", "", "Kubernetes master location. Leave blank for default")
@@ -730,7 +731,7 @@ func defaultLeaderElectionConfiguration() componentbaseconfig.LeaderElectionConf
 		RenewDeadline: metav1.Duration{Duration: defaultRenewDeadline},
 		RetryPeriod:   metav1.Duration{Duration: defaultRetryPeriod},
 		ResourceLock:  resourcelock.LeasesResourceLock,
-		ResourceName:  "cluster-autoscaler",
+		ResourceName:  *resourceName,
 	}
 }
 
