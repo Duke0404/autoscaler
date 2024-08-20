@@ -18,6 +18,7 @@ package orchestrator
 
 import (
 	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -37,7 +38,7 @@ import (
 // ProvisioningClass is an interface for ProvisioningRequests.
 type ProvisioningClass interface {
 	Provision([]*apiv1.Pod, []*apiv1.Node, []*appsv1.DaemonSet,
-		map[string]*schedulerframework.NodeInfo) (*status.ScaleUpStatus, ca_errors.AutoscalerError)
+		map[string]*schedulerframework.NodeInfo, time.Time, time.Duration) (*status.ScaleUpStatus, ca_errors.AutoscalerError)
 	Initialize(*context.AutoscalingContext, *ca_processors.AutoscalingProcessors, *clusterstate.ClusterStateRegistry,
 		estimator.EstimatorBuilder, taints.TaintConfig, *scheduling.HintingSimulator)
 }
@@ -84,6 +85,7 @@ func (o *provReqOrchestrator) ScaleUp(
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
 	_ bool, // Provision() doesn't use this parameter.
+	provisioningRequestBatchProcessingTimebox time.Duration,
 ) (*status.ScaleUpStatus, ca_errors.AutoscalerError) {
 	if !o.initialized {
 		return &status.ScaleUpStatus{}, ca_errors.ToAutoscalerError(ca_errors.InternalError, fmt.Errorf("provisioningrequest.Orchestrator is not initialized"))
@@ -103,9 +105,11 @@ func (o *provReqOrchestrator) ScaleUp(
 	// }
 	// return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
 
+	startTime := time.Now()
+
 	// unschedulablePods pods can belong to multiple ProvisioningClasses, so all provClasses should try to ScaleUp.
 	for _, provClass := range o.provisioningClasses {
-		st, err := provClass.Provision(unschedulablePods, nodes, daemonSets, nodeInfos)
+		st, err := provClass.Provision(unschedulablePods, nodes, daemonSets, nodeInfos, startTime, provisioningRequestBatchProcessingTimebox)
 		if err != nil {
 			return st, err // TODO: Ask if function should return if error occurred
 		}

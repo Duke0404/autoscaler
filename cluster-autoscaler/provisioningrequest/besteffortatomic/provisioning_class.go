@@ -17,6 +17,8 @@ limitations under the License.
 package besteffortatomic
 
 import (
+	"time"
+
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -77,6 +79,9 @@ func (o *bestEffortAtomicProvClass) Provision(
 	nodes []*apiv1.Node,
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
+	startTime time.Time,
+	provisioningRequestBatchProcessingTimebox time.Duration,
+
 ) (*status.ScaleUpStatus, errors.AutoscalerError) {
 	if len(unschedulablePods) == 0 {
 		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
@@ -140,6 +145,10 @@ func (o *bestEffortAtomicProvClass) Provision(
 
 	// Process all pods from all provisioning requests.
 	for _, pr := range prs {
+		if time.Now().Sub(startTime) > provisioningRequestBatchProcessingTimebox {
+			break
+		}
+
 		o.context.ClusterSnapshot.Fork()
 		defer o.context.ClusterSnapshot.Revert()
 		
@@ -163,7 +172,7 @@ func (o *bestEffortAtomicProvClass) Provision(
 			continue
 		}
 
-		st, err := o.scaleUpOrchestrator.ScaleUp(actuallyUnschedulablePods, nodes, daemonSets, nodeInfos, true)
+		st, err := o.scaleUpOrchestrator.ScaleUp(actuallyUnschedulablePods, nodes, daemonSets, nodeInfos, true, time.Minute)
 		if err == nil && st.Result == status.ScaleUpSuccessful {
 			// Happy path - all is well.
 			conditions.AddOrUpdateCondition(pr, v1beta1.Provisioned, metav1.ConditionTrue, conditions.CapacityIsProvisionedReason, conditions.CapacityIsProvisionedMsg, metav1.Now())

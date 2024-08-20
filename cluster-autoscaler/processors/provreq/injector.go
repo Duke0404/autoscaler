@@ -36,13 +36,13 @@ import (
 
 const (
 	defaultRetryTime            = 10 * time.Minute
-	ProvisioningRequestsPerLoop = 10
 )
 
 // ProvisioningRequestPodsInjector creates in-memory pods from ProvisioningRequest and inject them to unscheduled pods list.
 type ProvisioningRequestPodsInjector struct {
 	client *provreqclient.ProvisioningRequestClient
 	clock  clock.PassiveClock
+	ProvisioningRequestsPerLoop int
 }
 
 // Process pick one ProvisioningRequest, update Accepted condition and inject pods to unscheduled pods list.
@@ -96,7 +96,7 @@ func (p *ProvisioningRequestPodsInjector) Process(
 			}
 			unschedulablePods := append(unschedulablePods, provreqpods...)
 			provisionRequestsInjected++
-			if provisionRequestsInjected >= ProvisioningRequestsPerLoop {
+			if provisionRequestsInjected >= p.ProvisioningRequestsPerLoop {
 				return unschedulablePods, nil
 			}
 		}
@@ -108,10 +108,10 @@ func (p *ProvisioningRequestPodsInjector) Process(
 func (p *ProvisioningRequestPodsInjector) CleanUp() {}
 
 // NewProvisioningRequestPodsInjector creates a ProvisioningRequest filter processor.
-func NewProvisioningRequestPodsInjector(kubeConfig *rest.Config) (pods.PodListProcessor, error) {
+func NewProvisioningRequestPodsInjector(kubeConfig *rest.Config, ProvisioningRequestsPerLoop int) (pods.PodListProcessor, error) {
 	client, err := provreqclient.NewProvisioningRequestClient(kubeConfig)
 	if err != nil {
 		return nil, err
 	}
-	return &ProvisioningRequestPodsInjector{client: client, clock: clock.RealClock{}}, nil
+	return &ProvisioningRequestPodsInjector{client: client, clock: clock.RealClock{}, ProvisioningRequestsPerLoop: ProvisioningRequestsPerLoop}, nil
 }

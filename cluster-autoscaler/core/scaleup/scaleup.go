@@ -17,6 +17,8 @@ limitations under the License.
 package scaleup
 
 import (
+	"time"
+
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/clusterstate"
@@ -49,6 +51,7 @@ type Orchestrator interface {
 		daemonSets []*appsv1.DaemonSet,
 		nodeInfos map[string]*schedulerframework.NodeInfo,
 		allOrNothing bool,
+		provisioningRequestBatchProcessingTimebox time.Duration,
 	) (*status.ScaleUpStatus, errors.AutoscalerError)
 	// ScaleUpToNodeGroupMinSize tries to scale up node groups that have less nodes
 	// than the configured min size. The source of truth for the current node group

@@ -87,6 +87,8 @@ type StaticAutoscaler struct {
 	lastScaleUpTime         time.Time
 	lastScaleDownDeleteTime time.Time
 	lastScaleDownFailTime   time.Time
+	provisioningRequestsPerLoop int
+	provisioningRequestBatchProcessingTimebox time.Duration
 	scaleDownPlanner        scaledown.Planner
 	scaleDownActuator       scaledown.Actuator
 	scaleUpOrchestrator     scaleup.Orchestrator
@@ -204,6 +206,7 @@ func NewStaticAutoscaler(
 		lastScaleUpTime:         initialScaleTime,
 		lastScaleDownDeleteTime: initialScaleTime,
 		lastScaleDownFailTime:   initialScaleTime,
+		provisioningRequestBatchProcessingTimebox: 	opts.ProvisioningRequestBatchProcessingTimebox,
 		scaleDownPlanner:        scaleDownPlanner,
 		scaleDownActuator:       scaleDownActuator,
 		scaleUpOrchestrator:     scaleUpOrchestrator,
@@ -567,7 +570,7 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 		klog.V(1).Info("Unschedulable pods are very new, waiting one iteration for more")
 	} else {
 		scaleUpStart := preScaleUp()
-		scaleUpStatus, typedErr = a.scaleUpOrchestrator.ScaleUp(unschedulablePodsToHelp, readyNodes, daemonsets, nodeInfosForGroups, false)
+		scaleUpStatus, typedErr = a.scaleUpOrchestrator.ScaleUp(unschedulablePodsToHelp, readyNodes, daemonsets, nodeInfosForGroups, false, a.provisioningRequestBatchProcessingTimebox)
 		if exit, err := postScaleUp(scaleUpStart); exit {
 			return err
 		}

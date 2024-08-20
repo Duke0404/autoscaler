@@ -18,6 +18,7 @@ package checkcapacity
 
 import (
 	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -69,6 +70,8 @@ func (o *checkCapacityProvClass) Provision(
 	nodes []*apiv1.Node,
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
+	startTime time.Time,
+	provisioningRequestBatchProcessingTimebox time.Duration,
 ) (*status.ScaleUpStatus, errors.AutoscalerError) {
 	if len(unschedulablePods) == 0 {
 		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
@@ -99,6 +102,10 @@ func (o *checkCapacityProvClass) Provision(
 	defer o.context.ClusterSnapshot.Revert()
 	// Process all pods from all provisioning requests.
 	for _, pr := range prs {
+		if time.Now().Sub(startTime) > provisioningRequestBatchProcessingTimebox {
+			break
+		}
+
 		o.context.ClusterSnapshot.Fork()
 		defer o.context.ClusterSnapshot.Revert()
 		

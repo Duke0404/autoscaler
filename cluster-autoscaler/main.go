@@ -443,7 +443,6 @@ func createAutoscalingOptions() config.AutoscalingOptions {
 		DynamicNodeDeleteDelayAfterTaintEnabled:   *dynamicNodeDeleteDelayAfterTaintEnabled,
 		BypassedSchedulers:                        scheduler_util.GetBypassedSchedulersMap(*bypassedSchedulers),
 		ProvisioningRequestEnabled:                *provisioningRequestsEnabled,
-		ProvisioningRequestsPerLoop:               *provisioningRequestsPerLoop,
 		ProvisioningRequestBatchProcessingTimebox: *provisioningrequestBatchProcessingTimebox,
 	}
 }
@@ -523,7 +522,7 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 			return nil, err
 		}
 		opts.LoopStartNotifier = loopstart.NewObserversList([]loopstart.Observer{provreqProcesor})
-		injector, err := provreq.NewProvisioningRequestPodsInjector(restConfig)
+		injector, err := provreq.NewProvisioningRequestPodsInjector(restConfig, *provisioningRequestsPerLoop)
 		if err != nil {
 			return nil, err
 		}

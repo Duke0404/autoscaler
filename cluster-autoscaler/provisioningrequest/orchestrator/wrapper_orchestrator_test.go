@@ -18,6 +18,7 @@ package orchestrator
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	appsv1 "k8s.io/api/apps/v1"
@@ -56,14 +57,15 @@ func TestWrapperScaleUp(t *testing.T) {
 		pod.Annotations[v1beta1.ProvisioningRequestPodAnnotationKey] = "true"
 	}
 	unschedulablePods := append(regularPods, provReqPods...)
-	_, err := o.ScaleUp(unschedulablePods, nil, nil, nil, false)
+	_, err := o.ScaleUp(unschedulablePods, nil, nil, nil, false, time.Minute)
 	assert.Equal(t, err.Error(), provisioningRequestErrorMsg)
-	_, err = o.ScaleUp(unschedulablePods, nil, nil, nil, false)
+	_, err = o.ScaleUp(unschedulablePods, nil, nil, nil, false, time.Minute)
 	assert.Equal(t, err.Error(), regularPodsErrorMsg)
 }
 
 type fakeScaleUp struct {
 	errorMsg string
+
 }
 
 func (f *fakeScaleUp) ScaleUp(
@@ -72,6 +74,7 @@ func (f *fakeScaleUp) ScaleUp(
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
 	allOrNothing bool,
+	provisioningRequestBatchProcessingTimebox time.Duration,
 ) (*status.ScaleUpStatus, errors.AutoscalerError) {
 	return nil, errors.NewAutoscalerError(errors.InternalError, f.errorMsg)
 }
