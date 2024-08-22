@@ -641,7 +641,7 @@ func main() {
 	featureGate.AddFlag(pflag.CommandLine)
 	kube_flag.InitFlags()
 
-    leaderElection := defaultLeaderElectionConfiguration()
+	leaderElection := defaultLeaderElectionConfiguration()
 	leaderElection.LeaderElect = true
 	componentopts.BindLeaderElectionFlags(&leaderElection, pflag.CommandLine)
 
