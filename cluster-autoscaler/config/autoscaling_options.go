@@ -295,6 +295,8 @@ type AutoscalingOptions struct {
 	BypassedSchedulers map[string]bool
 	// ProvisioningRequestEnabled tells if CA processes ProvisioningRequest.
 	ProvisioningRequestEnabled bool
+	// AsyncNodeGroupsEnabled tells if CA creates/deletes node groups asynchronously.
+	AsyncNodeGroupsEnabled bool
 	// provisioningRequestBatchProcessing tells if CA processes ProvisioningRequests in batch.
 	ProvisioningRequestBatchProcessing bool
 	// ProvisioningRequestsPerLoop is the maximum number of ProvisioningRequests CA processes in a single loop.
