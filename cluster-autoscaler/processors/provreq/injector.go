@@ -42,7 +42,6 @@ const (
 type ProvisioningRequestPodsInjector struct {
 	client *provreqclient.ProvisioningRequestClient
 	clock  clock.PassiveClock
-	ProvisioningRequestsPerLoop int
 }
 
 // Process pick one ProvisioningRequest, update Accepted condition and inject pods to unscheduled pods list.
@@ -54,9 +53,6 @@ func (p *ProvisioningRequestPodsInjector) Process(
 	if err != nil {
 		return nil, err
 	}
-
-	provisionRequestsInjected := 0
-
 	for _, pr := range provReqs {
 		if ok, found := provisioningrequest.SupportedProvisioningClasses[pr.Spec.ProvisioningClassName]; !ok || !found {
 			klog.Warningf("Provisioning Class %s is not supported", pr.Spec.ProvisioningClassName)
@@ -95,10 +91,7 @@ func (p *ProvisioningRequestPodsInjector) Process(
 				continue
 			}
 			unschedulablePods := append(unschedulablePods, provreqpods...)
-			provisionRequestsInjected++
-			if provisionRequestsInjected >= p.ProvisioningRequestsPerLoop {
-				return unschedulablePods, nil
-			}
+			return unschedulablePods, nil
 		}
 	}
 	return unschedulablePods, nil
@@ -108,10 +101,10 @@ func (p *ProvisioningRequestPodsInjector) Process(
 func (p *ProvisioningRequestPodsInjector) CleanUp() {}
 
 // NewProvisioningRequestPodsInjector creates a ProvisioningRequest filter processor.
-func NewProvisioningRequestPodsInjector(kubeConfig *rest.Config, ProvisioningRequestsPerLoop int) (pods.PodListProcessor, error) {
+func NewProvisioningRequestPodsInjector(kubeConfig *rest.Config) (pods.PodListProcessor, error) {
 	client, err := provreqclient.NewProvisioningRequestClient(kubeConfig)
 	if err != nil {
 		return nil, err
 	}
-	return &ProvisioningRequestPodsInjector{client: client, clock: clock.RealClock{}, ProvisioningRequestsPerLoop: ProvisioningRequestsPerLoop}, nil
+	return &ProvisioningRequestPodsInjector{client: client, clock: clock.RealClock{}}, nil
 }

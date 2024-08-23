@@ -294,7 +294,11 @@ type AutoscalingOptions struct {
 	// BypassedSchedulers are used to specify which schedulers to bypass their processing
 	BypassedSchedulers map[string]bool
 	// ProvisioningRequestEnabled tells if CA processes ProvisioningRequest.
-	ProvisioningRequestEnabled bool	
+	ProvisioningRequestEnabled bool
+	// provisioningRequestBatchProcessing tells if CA processes ProvisioningRequests in batch.
+	ProvisioningRequestBatchProcessing bool
+	// ProvisioningRequestsPerLoop is the maximum number of ProvisioningRequests CA processes in a single loop.
+	ProvisioningRequestsPerLoop int
 	// provisioningrequestBatchProcessingTimebox is the maximum time CA spends processing ProvisioningRequests in a single loop.
 	ProvisioningRequestBatchProcessingTimebox time.Duration
 }

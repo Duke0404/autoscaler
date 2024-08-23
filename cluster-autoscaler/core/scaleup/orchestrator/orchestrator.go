@@ -89,6 +89,8 @@ func (o *ScaleUpOrchestrator) ScaleUp(
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
 	allOrNothing bool, // Either request enough capacity for all unschedulablePods, or don't request it at all.
+	_ bool, // Normal pod scale-up doesn't use this parameter.
+	_ int, // Normal pod scale-up doesn't use this parameter.
 	_ time.Duration, // Normal pod scale-up doesn't use this parameter.
 ) (*status.ScaleUpStatus, errors.AutoscalerError) {
 	if !o.initialized {

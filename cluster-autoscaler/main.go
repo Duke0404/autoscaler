@@ -266,6 +266,7 @@ var (
 			"Eg. flag usage:  '10000:20,1000:100,0:60'")
 	provisioningRequestsEnabled               = flag.Bool("enable-provisioning-requests", false, "Whether the clusterautoscaler will be handling the ProvisioningRequest CRs.")
 	frequentLoopsEnabled                      = flag.Bool("frequent-loops-enabled", false, "Whether clusterautoscaler triggers new iterations more frequently when it's needed")
+	provisioningRequestBatchProcessing 	      = flag.Bool("provisioning-request-batch-processing", false, "Whether the clusterautoscaler will process ProvisioningRequests in batches.")
 	provisioningRequestsPerLoop               = flag.Int("provisioning-requests-per-loop", 10, "Maximum number of ProvisioningRequests to process in a single loop iteration")
 	provisioningrequestBatchProcessingTimebox = flag.Duration("provisioning-request-batch-processing-timebox", 10*time.Second, "Maximum time to process a batch of ProvisioningRequests")
 )
@@ -443,6 +444,8 @@ func createAutoscalingOptions() config.AutoscalingOptions {
 		DynamicNodeDeleteDelayAfterTaintEnabled:   *dynamicNodeDeleteDelayAfterTaintEnabled,
 		BypassedSchedulers:                        scheduler_util.GetBypassedSchedulersMap(*bypassedSchedulers),
 		ProvisioningRequestEnabled:                *provisioningRequestsEnabled,
+		ProvisioningRequestBatchProcessing:        *provisioningRequestBatchProcessing,
+		ProvisioningRequestsPerLoop:               *provisioningRequestsPerLoop,
 		ProvisioningRequestBatchProcessingTimebox: *provisioningrequestBatchProcessingTimebox,
 	}
 }
@@ -522,7 +525,7 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 			return nil, err
 		}
 		opts.LoopStartNotifier = loopstart.NewObserversList([]loopstart.Observer{provreqProcesor})
-		injector, err := provreq.NewProvisioningRequestPodsInjector(restConfig, *provisioningRequestsPerLoop)
+		injector, err := provreq.NewProvisioningRequestPodsInjector(restConfig)
 		if err != nil {
 			return nil, err
 		}

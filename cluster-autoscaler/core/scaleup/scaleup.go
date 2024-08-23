@@ -51,6 +51,8 @@ type Orchestrator interface {
 		daemonSets []*appsv1.DaemonSet,
 		nodeInfos map[string]*schedulerframework.NodeInfo,
 		allOrNothing bool,
+		provisioningRequestBatchProcessing bool,
+		provisioningRequestsPerLoop int,
 		provisioningRequestBatchProcessingTimebox time.Duration,
 	) (*status.ScaleUpStatus, errors.AutoscalerError)
 	// ScaleUpToNodeGroupMinSize tries to scale up node groups that have less nodes

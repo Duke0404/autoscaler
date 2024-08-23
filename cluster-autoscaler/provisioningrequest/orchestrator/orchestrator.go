@@ -85,6 +85,8 @@ func (o *provReqOrchestrator) ScaleUp(
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
 	_ bool, // Provision() doesn't use this parameter.
+	provisioningrequestBatchProcessing bool,
+	provisioningRequestsPerLoop int,
 	provisioningRequestBatchProcessingTimebox time.Duration,
 ) (*status.ScaleUpStatus, ca_errors.AutoscalerError) {
 	if !o.initialized {
