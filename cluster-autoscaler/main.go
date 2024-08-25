@@ -501,6 +501,7 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 		DeleteOptions:        deleteOptions,
 		DrainabilityRules:    drainabilityRules,
 		ScaleUpOrchestrator:  orchestrator.New(),
+		ProvisioningRequestPodsInjector: nil,
 	}
 
 	opts.Processors = ca_processors.DefaultProcessors(autoscalingOptions)
@@ -531,7 +532,11 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 		if err != nil {
 			return nil, err
 		}
-		podListProcessor.AddProcessor(injector)
+		if !autoscalingOptions.ProvisioningRequestBatchProcessing {
+			podListProcessor.AddProcessor(injector)
+		} else {
+			opts.ProvisioningRequestPodsInjector = injector
+		}
 		podListProcessor.AddProcessor(provreqProcesor)
 	}
 	opts.Processors.PodListProcessor = podListProcessor

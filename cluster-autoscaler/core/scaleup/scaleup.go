@@ -25,6 +25,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/context"
 	"k8s.io/autoscaler/cluster-autoscaler/estimator"
 	ca_processors "k8s.io/autoscaler/cluster-autoscaler/processors"
+	"k8s.io/autoscaler/cluster-autoscaler/processors/pods"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/status"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/taints"
@@ -54,6 +55,8 @@ type Orchestrator interface {
 		provisioningRequestBatchProcessing bool,
 		provisioningRequestsPerLoop int,
 		provisioningRequestBatchProcessingTimebox time.Duration,
+		provisioningRequestPodsInjector pods.PodListProcessor,
+		autoscalingContext *context.AutoscalingContext,
 	) (*status.ScaleUpStatus, errors.AutoscalerError)
 	// ScaleUpToNodeGroupMinSize tries to scale up node groups that have less nodes
 	// than the configured min size. The source of truth for the current node group

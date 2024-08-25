@@ -18,7 +18,6 @@ package checkcapacity
 
 import (
 	"fmt"
-	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -70,8 +69,6 @@ func (o *checkCapacityProvClass) Provision(
 	nodes []*apiv1.Node,
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
-	startTime time.Time,
-	provisioningRequestBatchProcessingTimebox time.Duration,
 ) (*status.ScaleUpStatus, errors.AutoscalerError) {
 	if len(unschedulablePods) == 0 {
 		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
@@ -83,39 +80,18 @@ func (o *checkCapacityProvClass) Provision(
 		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
 	}
 	// Pick 1 ProvisioningRequest.
-	// pr := prs[0]
-	// o.context.ClusterSnapshot.Fork()
-	// defer o.context.ClusterSnapshot.Revert()
-
-	// scaleUpIsSuccessful, err := o.checkcapacity(unschedulablePods, pr)
-	// if err != nil {
-	// 	return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
-	// }
-	// if scaleUpIsSuccessful {
-	// 	return &status.ScaleUpStatus{Result: status.ScaleUpSuccessful}, nil
-	// }
-	// return &status.ScaleUpStatus{Result: status.ScaleUpNoOptionsAvailable}, nil
-
-	combinedStatus := &status.ScaleUpStatus{Result: status.ScaleUpSuccessful}
-
+	pr := prs[0]
 	o.context.ClusterSnapshot.Fork()
 	defer o.context.ClusterSnapshot.Revert()
-	// Process all pods from all provisioning requests.
-	for _, pr := range prs {
-		if time.Now().Sub(startTime) > provisioningRequestBatchProcessingTimebox {
-			break
-		}
 
-		o.context.ClusterSnapshot.Fork()
-		defer o.context.ClusterSnapshot.Revert()
-		
-		_, err := o.checkcapacity(unschedulablePods, pr)
-		if err != nil {
-			return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
-		}
+	scaleUpIsSuccessful, err := o.checkcapacity(unschedulablePods, pr)
+	if err != nil {
+		return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
 	}
-
-	return combinedStatus, nil
+	if scaleUpIsSuccessful {
+		return &status.ScaleUpStatus{Result: status.ScaleUpSuccessful}, nil
+	}
+	return &status.ScaleUpStatus{Result: status.ScaleUpNoOptionsAvailable}, nil
 }
 
 // Assuming that all unschedulable pods comes from one ProvisioningRequest.

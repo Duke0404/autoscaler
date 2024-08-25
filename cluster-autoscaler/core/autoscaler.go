@@ -32,6 +32,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/expander/factory"
 	"k8s.io/autoscaler/cluster-autoscaler/observers/loopstart"
 	ca_processors "k8s.io/autoscaler/cluster-autoscaler/processors"
+	"k8s.io/autoscaler/cluster-autoscaler/processors/pods"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/drainability/rules"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/options"
@@ -61,6 +62,7 @@ type AutoscalerOptions struct {
 	ScaleUpOrchestrator    scaleup.Orchestrator
 	DeleteOptions          options.NodeDeleteOptions
 	DrainabilityRules      rules.Rules
+	ProvisioningRequestPodsInjector pods.PodListProcessor
 }
 
 // Autoscaler is the main component of CA which scales up/down node groups according to its configuration
@@ -100,6 +102,7 @@ func NewAutoscaler(opts AutoscalerOptions, informerFactory informers.SharedInfor
 		opts.ScaleUpOrchestrator,
 		opts.DeleteOptions,
 		opts.DrainabilityRules,
+		opts.ProvisioningRequestPodsInjector,
 	), nil
 }
 

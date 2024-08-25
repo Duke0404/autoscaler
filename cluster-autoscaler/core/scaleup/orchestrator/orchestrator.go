@@ -37,6 +37,7 @@ import (
 	ca_processors "k8s.io/autoscaler/cluster-autoscaler/processors"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/nodegroups"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/nodegroupset"
+	"k8s.io/autoscaler/cluster-autoscaler/processors/pods"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/status"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/klogx"
@@ -92,6 +93,8 @@ func (o *ScaleUpOrchestrator) ScaleUp(
 	_ bool, // Normal pod scale-up doesn't use this parameter.
 	_ int, // Normal pod scale-up doesn't use this parameter.
 	_ time.Duration, // Normal pod scale-up doesn't use this parameter.
+	_ pods.PodListProcessor, // Normal pod scale-up doesn't use this parameter.
+	_ *context.AutoscalingContext, // Normal pod scale-up doesn't use this parameter.
 ) (*status.ScaleUpStatus, errors.AutoscalerError) {
 	if !o.initialized {
 		return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "ScaleUpOrchestrator is not initialized"))

@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	defaultRetryTime            = 10 * time.Minute
+	defaultRetryTime = 10 * time.Minute
 )
 
 // ProvisioningRequestPodsInjector creates in-memory pods from ProvisioningRequest and inject them to unscheduled pods list.

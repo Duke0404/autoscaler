@@ -59,6 +59,7 @@ import (
 	caerrors "k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	scheduler_utils "k8s.io/autoscaler/cluster-autoscaler/utils/scheduler"
 	"k8s.io/utils/integer"
+	"k8s.io/autoscaler/cluster-autoscaler/processors/pods"
 
 	klog "k8s.io/klog/v2"
 )
@@ -98,6 +99,7 @@ type StaticAutoscaler struct {
 	processorCallbacks      *staticAutoscalerProcessorCallbacks
 	initialized             bool
 	taintConfig             taints.TaintConfig
+	provisioningRequestPodsInjector pods.PodListProcessor
 }
 
 type staticAutoscalerProcessorCallbacks struct {
@@ -150,7 +152,8 @@ func NewStaticAutoscaler(
 	remainingPdbTracker pdb.RemainingPdbTracker,
 	scaleUpOrchestrator scaleup.Orchestrator,
 	deleteOptions options.NodeDeleteOptions,
-	drainabilityRules rules.Rules) *StaticAutoscaler {
+	drainabilityRules rules.Rules,
+	provisioningRequestPodsInjector pods.PodListProcessor) *StaticAutoscaler {
 
 	clusterStateConfig := clusterstate.ClusterStateRegistryConfig{
 		MaxTotalUnreadyPercentage: opts.MaxTotalUnreadyPercentage,
@@ -574,7 +577,7 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 		klog.V(1).Info("Unschedulable pods are very new, waiting one iteration for more")
 	} else {
 		scaleUpStart := preScaleUp()
-		scaleUpStatus, typedErr = a.scaleUpOrchestrator.ScaleUp(unschedulablePodsToHelp, readyNodes, daemonsets, nodeInfosForGroups, false, a.ProvisioningRequestBatchProcessing, a.ProvisioningRequestsPerLoop, a.ProvisioningRequestBatchProcessingTimebox)
+		scaleUpStatus, typedErr = a.scaleUpOrchestrator.ScaleUp(unschedulablePodsToHelp, readyNodes, daemonsets, nodeInfosForGroups, false, a.ProvisioningRequestBatchProcessing, a.ProvisioningRequestsPerLoop, a.ProvisioningRequestBatchProcessingTimebox, a.provisioningRequestPodsInjector, autoscalingContext)
 		if exit, err := postScaleUp(scaleUpStart); exit {
 			return err
 		}

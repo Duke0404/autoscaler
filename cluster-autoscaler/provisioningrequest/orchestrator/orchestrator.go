@@ -30,6 +30,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/scheduling"
 	ca_errors "k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/taints"
+	"k8s.io/autoscaler/cluster-autoscaler/processors/pods"
 
 	ca_processors "k8s.io/autoscaler/cluster-autoscaler/processors"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
@@ -38,7 +39,7 @@ import (
 // ProvisioningClass is an interface for ProvisioningRequests.
 type ProvisioningClass interface {
 	Provision([]*apiv1.Pod, []*apiv1.Node, []*appsv1.DaemonSet,
-		map[string]*schedulerframework.NodeInfo, time.Time, time.Duration) (*status.ScaleUpStatus, ca_errors.AutoscalerError)
+		map[string]*schedulerframework.NodeInfo) (*status.ScaleUpStatus, ca_errors.AutoscalerError)
 	Initialize(*context.AutoscalingContext, *ca_processors.AutoscalingProcessors, *clusterstate.ClusterStateRegistry,
 		estimator.EstimatorBuilder, taints.TaintConfig, *scheduling.HintingSimulator)
 }
@@ -88,6 +89,8 @@ func (o *provReqOrchestrator) ScaleUp(
 	provisioningrequestBatchProcessing bool,
 	provisioningRequestsPerLoop int,
 	provisioningRequestBatchProcessingTimebox time.Duration,
+	provisioningRequestPodsInjector pods.PodListProcessor,
+	context *context.AutoscalingContext,
 ) (*status.ScaleUpStatus, ca_errors.AutoscalerError) {
 	if !o.initialized {
 		return &status.ScaleUpStatus{}, ca_errors.ToAutoscalerError(ca_errors.InternalError, fmt.Errorf("provisioningrequest.Orchestrator is not initialized"))
@@ -97,6 +100,8 @@ func (o *provReqOrchestrator) ScaleUp(
 	defer o.context.ClusterSnapshot.Revert()
 
 	combinedStatus := &status.ScaleUpStatus{Result: status.ScaleUpNotTried}
+	provisioningRequestsProcessed := 0
+	startTime := time.Now()
 
 	// unschedulablePods pods should belong to one ProvisioningClass, so only one provClass should try to ScaleUp.
 	// for _, provClass := range o.provisioningClasses {
@@ -107,20 +112,48 @@ func (o *provReqOrchestrator) ScaleUp(
 	// }
 	// return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
 
-	startTime := time.Now()
+	// startTime := time.Now()
 
-	// unschedulablePods pods can belong to multiple ProvisioningClasses, so all provClasses should try to ScaleUp.
-	for _, provClass := range o.provisioningClasses {
-		st, err := provClass.Provision(unschedulablePods, nodes, daemonSets, nodeInfos, startTime, provisioningRequestBatchProcessingTimebox)
-		if err != nil {
-			return st, err // TODO: Ask if function should return if error occurred
+	// // unschedulablePods pods can belong to multiple ProvisioningClasses, so all provClasses should try to ScaleUp.
+	// for _, provClass := range o.provisioningClasses {
+	// 	st, err := provClass.Provision(unschedulablePods, nodes, daemonSets, nodeInfos, startTime, provisioningRequestBatchProcessingTimebox)
+	// 	if err != nil {
+	// 		return st, err // TODO: Ask if function should return if error occurred
+	// 	}
+	// 	if st != nil && st.Result == status.ScaleUpSuccessful {
+	// 		combinedStatus = st
+	// 	}
+	// }
+
+	// return combinedStatus, nil // TODO: Refactor to return combined status. Maybe create new status which indicates partial success.
+
+	for len(unschedulablePods) > 0 {
+		// unschedulablePods pods should belong to one ProvisioningClass, so only one provClass should try to ScaleUp.
+		for _, provClass := range o.provisioningClasses {
+			st, err := provClass.Provision(unschedulablePods, nodes, daemonSets, nodeInfos)
+			if err != nil || st != nil && st.Result != status.ScaleUpNotTried {
+				return st, err
+			} else if st != nil && st.Result == status.ScaleUpSuccessful {
+				combinedStatus = st
+				break
+			}
+			
 		}
-		if st != nil && st.Result == status.ScaleUpSuccessful {
-			combinedStatus = st
+
+		provisioningRequestsProcessed++
+		if provisioningRequestsProcessed >= provisioningRequestsPerLoop && time.Since(startTime) >= provisioningRequestBatchProcessingTimebox {
+			break
+		}
+
+		// Add unshedulable pods from the next provisioning request to the list of unschedulable pods
+		var err error
+		unschedulablePods, err = provisioningRequestPodsInjector.Process(o.context, unschedulablePods)
+		if err != nil {
+			return &status.ScaleUpStatus{}, ca_errors.ToAutoscalerError(ca_errors.InternalError, err)
 		}
 	}
 
-	return combinedStatus, nil // TODO: Refactor to return combined status. Maybe create new status which indicates partial success.
+	return combinedStatus, nil
 }
 
 // ScaleUpToNodeGroupMinSize doesn't have implementation for ProvisioningRequest Orchestrator.
