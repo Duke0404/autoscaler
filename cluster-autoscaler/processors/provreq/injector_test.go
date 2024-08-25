@@ -117,7 +117,7 @@ func TestProvisioningRequestPodsInjector(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		client := provreqclient.NewFakeProvisioningRequestClient(context.Background(), t, tc.provReqs...)
-		injector := ProvisioningRequestPodsInjector{client, clock.NewFakePassiveClock(now), 1}
+		injector := ProvisioningRequestPodsInjector{client, clock.NewFakePassiveClock(now)}
 		getUnscheduledPods, err := injector.Process(nil, []*v1.Pod{})
 		if err != nil {
 			t.Errorf("%s failed: injector.Process return error %v", tc.name, err)
