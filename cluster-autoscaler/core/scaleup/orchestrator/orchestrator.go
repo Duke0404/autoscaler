@@ -94,7 +94,6 @@ func (o *ScaleUpOrchestrator) ScaleUp(
 	_ int, // Normal pod scale-up doesn't use this parameter.
 	_ time.Duration, // Normal pod scale-up doesn't use this parameter.
 	_ pods.PodListProcessor, // Normal pod scale-up doesn't use this parameter.
-	_ *context.AutoscalingContext, // Normal pod scale-up doesn't use this parameter.
 ) (*status.ScaleUpStatus, errors.AutoscalerError) {
 	if !o.initialized {
 		return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "ScaleUpOrchestrator is not initialized"))

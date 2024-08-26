@@ -41,6 +41,7 @@ import (
 type WrapperOrchestrator struct {
 	// scaleUpRegularPods indicates that ScaleUp for regular pods will be run in the current CA loop, if they are present.
 	scaleUpRegularPods  bool
+	autoscalingContext *context.AutoscalingContext
 	podsOrchestrator    scaleup.Orchestrator
 	provReqOrchestrator scaleup.Orchestrator
 }
@@ -50,6 +51,7 @@ func NewWrapperOrchestrator(provReqOrchestrator scaleup.Orchestrator) *WrapperOr
 	return &WrapperOrchestrator{
 		podsOrchestrator:    orchestrator.New(),
 		provReqOrchestrator: provReqOrchestrator,
+		
 	}
 }
 
@@ -61,6 +63,7 @@ func (o *WrapperOrchestrator) Initialize(
 	estimatorBuilder estimator.EstimatorBuilder,
 	taintConfig taints.TaintConfig,
 ) {
+	o.autoscalingContext = autoscalingContext
 	o.podsOrchestrator.Initialize(autoscalingContext, processors, clusterStateRegistry, estimatorBuilder, taintConfig)
 	o.provReqOrchestrator.Initialize(autoscalingContext, processors, clusterStateRegistry, estimatorBuilder, taintConfig)
 }
@@ -76,14 +79,13 @@ func (o *WrapperOrchestrator) ScaleUp(
 	provisioningRequestsPerLoop int,
 	provisioningRequestBatchProcessingTimebox time.Duration,
 	provisioningRequestPodsInjector pods.PodListProcessor,
-	autoscalingContext *context.AutoscalingContext,
 ) (*status.ScaleUpStatus, errors.AutoscalerError) {
 	defer func() { o.scaleUpRegularPods = !o.scaleUpRegularPods }()
 
 	provReqPods, regularPods := []*apiv1.Pod{}, []*apiv1.Pod{}
 
 	if provisioningRequestBatchProcessing {
-		provReqPods, _ = provisioningRequestPodsInjector.Process(autoscalingContext, []*apiv1.Pod{})
+		provReqPods, _ = provisioningRequestPodsInjector.Process(o.autoscalingContext, []*apiv1.Pod{})
 		// TODO: How to handle when provisioning request pod fetching doesn't work inside orchestrator
 		regularPods = unschedulablePods
 		if len(provReqPods) == 0 {
@@ -101,13 +103,13 @@ func (o *WrapperOrchestrator) ScaleUp(
 	}
 
 	if o.scaleUpRegularPods {
-		return o.podsOrchestrator.ScaleUp(regularPods, nodes, daemonSets, nodeInfos, allOrNothing,provisioningRequestBatchProcessing, 0, 0 * time.Second, nil, nil)
+		return o.podsOrchestrator.ScaleUp(regularPods, nodes, daemonSets, nodeInfos, allOrNothing,provisioningRequestBatchProcessing, 0, 0 * time.Second, nil)
 	}
 	if provisioningRequestBatchProcessing {
-		return o.provReqOrchestrator.ScaleUp(provReqPods, nodes, daemonSets, nodeInfos, allOrNothing, provisioningRequestBatchProcessing, provisioningRequestsPerLoop, provisioningRequestBatchProcessingTimebox, provisioningRequestPodsInjector, autoscalingContext)
+		return o.provReqOrchestrator.ScaleUp(provReqPods, nodes, daemonSets, nodeInfos, allOrNothing, provisioningRequestBatchProcessing, provisioningRequestsPerLoop, provisioningRequestBatchProcessingTimebox, provisioningRequestPodsInjector)
 	}
 	
-	return o.provReqOrchestrator.ScaleUp(provReqPods, nodes, daemonSets, nodeInfos, allOrNothing, provisioningRequestBatchProcessing, provisioningRequestsPerLoop, provisioningRequestBatchProcessingTimebox, provisioningRequestPodsInjector, autoscalingContext)
+	return o.provReqOrchestrator.ScaleUp(provReqPods, nodes, daemonSets, nodeInfos, allOrNothing, provisioningRequestBatchProcessing, provisioningRequestsPerLoop, provisioningRequestBatchProcessingTimebox, provisioningRequestPodsInjector)
 }
 
 func splitOut(unschedulablePods []*apiv1.Pod) (provReqPods, regularPods []*apiv1.Pod) {

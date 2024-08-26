@@ -90,7 +90,6 @@ func (o *provReqOrchestrator) ScaleUp(
 	provisioningRequestsPerLoop int,
 	provisioningRequestBatchProcessingTimebox time.Duration,
 	provisioningRequestPodsInjector pods.PodListProcessor,
-	context *context.AutoscalingContext,
 ) (*status.ScaleUpStatus, ca_errors.AutoscalerError) {
 	if !o.initialized {
 		return &status.ScaleUpStatus{}, ca_errors.ToAutoscalerError(ca_errors.InternalError, fmt.Errorf("provisioningrequest.Orchestrator is not initialized"))
