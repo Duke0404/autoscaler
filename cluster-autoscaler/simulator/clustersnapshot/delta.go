@@ -478,14 +478,19 @@ func (snapshot *DeltaClusterSnapshot) Clear() {
 
 // Export returns a shallow copy of the changes made to the snapshot.
 // Time: O(1)
-func (snapshot *DeltaClusterSnapshot) Export() *DeltaClusterSnapshot {
+func (base *DeltaClusterSnapshot) Export() ClusterSnapshot {
 	return &DeltaClusterSnapshot{
-		data: snapshot.data,
+		data: base.data,
 	}
 }
 
 // Rebase rebases the snapshot to a new base snapshot.
 // Time: O(1)
-func (snapshot *DeltaClusterSnapshot) Rebase(base *DeltaClusterSnapshot) {
-	snapshot.data.baseData = base.data
+func (snapshot *DeltaClusterSnapshot) Rebase(base ClusterSnapshot) error {
+	snapshotBase, ok := base.(*DeltaClusterSnapshot)
+	if !ok {
+		return fmt.Errorf("cannot rebase to a different type of snapshot")
+	}
+	snapshot.data.baseData = snapshotBase.data
+	return nil
 }
