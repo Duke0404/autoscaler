@@ -30,6 +30,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/conditions"
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/provreqclient"
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/provreqwrapper"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/scheduling"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/taints"
@@ -84,12 +85,15 @@ func (o *checkCapacityProvClass) Provision(
 	o.context.ClusterSnapshot.Fork()
 	defer o.context.ClusterSnapshot.Revert()
 
+	var snapshotExport clustersnapshot.ClusterSnapshot
+
 	scaleUpIsSuccessful, err := o.checkcapacity(unschedulablePods, pr)
 	if err != nil {
 		return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
 	}
 	if scaleUpIsSuccessful {
-		return &status.ScaleUpStatus{Result: status.ScaleUpSuccessful}, nil
+		snapshotExport = o.context.ClusterSnapshot.Export()
+		return &status.ScaleUpStatus{Result: status.ScaleUpSuccessful, SuccessfulSnapshot: snapshotExport}, nil
 	}
 	return &status.ScaleUpStatus{Result: status.ScaleUpNoOptionsAvailable}, nil
 }

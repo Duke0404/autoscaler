@@ -52,6 +52,8 @@ type ClusterSnapshot interface {
 	Commit() error
 	// Clear reset cluster snapshot to empty, unforked state.
 	Clear()
+	Export() ClusterSnapshot
+	Rebase(snapshot ClusterSnapshot)
 }
 
 // ErrNodeNotFound means that a node wasn't found in the snapshot.

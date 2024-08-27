@@ -134,9 +134,11 @@ func (o *provReqOrchestrator) ScaleUp(
 				return st, err
 			} else if st != nil && st.Result == status.ScaleUpSuccessful {
 				combinedStatus = st
+				st.SuccessfulSnapshot.Rebase(o.context.ClusterSnapshot)
+				o.context.ClusterSnapshot = st.SuccessfulSnapshot
+				o.context.ClusterSnapshot.Commit()
 				break
 			}
-			
 		}
 
 		provisioningRequestsProcessed++

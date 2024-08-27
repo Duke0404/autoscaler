@@ -279,6 +279,7 @@ func (o *ScaleUpOrchestrator) ScaleUp(
 		CreateNodeGroupResults:  createNodeGroupResults,
 		PodsTriggeredScaleUp:    bestOption.Pods,
 		PodsAwaitEvaluation:     GetPodsAwaitingEvaluation(podEquivalenceGroups, bestOption.NodeGroup.Id()),
+		SuccessfulSnapshot:	     bestOption.Snapshot,
 	}, nil
 }
 
@@ -475,7 +476,7 @@ func (o *ScaleUpOrchestrator) ComputeExpansionOption(
 		o.autoscalingContext.ClusterSnapshot,
 		estimator.NewEstimationContext(o.autoscalingContext.MaxNodesTotal, option.SimilarNodeGroups, currentNodeCount),
 	)
-	option.NodeCount, option.Pods = expansionEstimator.Estimate(podGroups, nodeInfo, nodeGroup)
+	option.NodeCount, option.Pods, option.Snapshot = expansionEstimator.Estimate(podGroups, nodeInfo, nodeGroup)
 	metrics.UpdateDurationFromStart(metrics.Estimate, estimateStart)
 
 	autoscalingOptions, err := nodeGroup.GetOptions(o.autoscalingContext.NodeGroupDefaults)

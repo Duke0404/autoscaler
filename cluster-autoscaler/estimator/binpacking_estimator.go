@@ -91,12 +91,13 @@ func (e *BinpackingNodeEstimator) Estimate(
 	podsEquivalenceGroups []PodEquivalenceGroup,
 	nodeTemplate *schedulerframework.NodeInfo,
 	nodeGroup cloudprovider.NodeGroup,
-) (int, []*apiv1.Pod) {
+) (int, []*apiv1.Pod, clustersnapshot.ClusterSnapshot) {
 
 	e.limiter.StartEstimation(podsEquivalenceGroups, nodeGroup, e.context)
 	defer e.limiter.EndEstimation()
 
 	podsEquivalenceGroups = e.podOrderer.Order(podsEquivalenceGroups, nodeTemplate, nodeGroup)
+	var snapshotExport clustersnapshot.ClusterSnapshot
 
 	e.clusterSnapshot.Fork()
 	defer func() {
@@ -111,20 +112,22 @@ func (e *BinpackingNodeEstimator) Estimate(
 		remainingPods, err = e.tryToScheduleOnExistingNodes(estimationState, podsEquivalenceGroup.Pods)
 		if err != nil {
 			klog.Errorf(err.Error())
-			return 0, nil
+			return 0, nil, nil
 		}
 
 		err = e.tryToScheduleOnNewNodes(estimationState, nodeTemplate, remainingPods)
 		if err != nil {
 			klog.Errorf(err.Error())
-			return 0, nil
+			return 0, nil, nil
 		}
 	}
 
 	if e.estimationAnalyserFunc != nil {
 		e.estimationAnalyserFunc(e.clusterSnapshot, nodeGroup, estimationState.newNodesWithPods)
 	}
-	return len(estimationState.newNodesWithPods), estimationState.scheduledPods
+
+	snapshotExport = e.clusterSnapshot.Export()
+	return len(estimationState.newNodesWithPods), estimationState.scheduledPods, snapshotExport
 }
 
 func (e *BinpackingNodeEstimator) tryToScheduleOnExistingNodes(

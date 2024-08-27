@@ -475,3 +475,17 @@ func (snapshot *DeltaClusterSnapshot) Commit() error {
 func (snapshot *DeltaClusterSnapshot) Clear() {
 	snapshot.data = newInternalDeltaSnapshotData()
 }
+
+// Export returns a shallow copy of the changes made to the snapshot.
+// Time: O(1)
+func (snapshot *DeltaClusterSnapshot) Export() *DeltaClusterSnapshot {
+	return &DeltaClusterSnapshot{
+		data: snapshot.data,
+	}
+}
+
+// Rebase rebases the snapshot to a new base snapshot.
+// Time: O(1)
+func (snapshot *DeltaClusterSnapshot) Rebase(base *DeltaClusterSnapshot) {
+	snapshot.data.baseData = base.data
+}

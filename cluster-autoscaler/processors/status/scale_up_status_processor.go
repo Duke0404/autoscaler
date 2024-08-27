@@ -24,6 +24,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/context"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/nodegroups"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/nodegroupset"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 )
 
 // ScaleUpStatus is the status of a scale-up attempt. This includes information
@@ -40,6 +41,7 @@ type ScaleUpStatus struct {
 	ConsideredNodeGroups     []cloudprovider.NodeGroup
 	FailedCreationNodeGroups []cloudprovider.NodeGroup
 	FailedResizeNodeGroups   []cloudprovider.NodeGroup
+	SuccessfulSnapshot       clustersnapshot.ClusterSnapshot
 }
 
 // NoScaleUpInfo contains information about a pod that didn't trigger scale-up.
