@@ -25,12 +25,13 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/clusterstate"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
 	"k8s.io/autoscaler/cluster-autoscaler/estimator"
+	"k8s.io/autoscaler/cluster-autoscaler/processors/pods"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/status"
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/provreqclient"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/scheduling"
 	ca_errors "k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/taints"
-	"k8s.io/autoscaler/cluster-autoscaler/processors/pods"
+	"k8s.io/klog/v2"
 
 	ca_processors "k8s.io/autoscaler/cluster-autoscaler/processors"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
@@ -134,9 +135,18 @@ func (o *provReqOrchestrator) ScaleUp(
 				return st, err
 			} else if st != nil && st.Result == status.ScaleUpSuccessful {
 				combinedStatus = st
+
+				klog.Warning(st.SuccessfulSnapshot)
+
 				st.SuccessfulSnapshot.Rebase(o.context.ClusterSnapshot)
+
+				klog.Warning(st.SuccessfulSnapshot)
+
 				o.context.ClusterSnapshot = st.SuccessfulSnapshot
 				o.context.ClusterSnapshot.Commit()
+
+				klog.Warning(o.context.ClusterSnapshot)
+
 				break
 			}
 		}
@@ -154,6 +164,7 @@ func (o *provReqOrchestrator) ScaleUp(
 		}
 	}
 
+	klog.Warningf("%d provisioning requests processed in this loop that took %v", provisioningRequestsProcessed, time.Since(startTime))
 	return combinedStatus, nil
 }
 

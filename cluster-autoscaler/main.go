@@ -535,6 +535,7 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 		if !autoscalingOptions.ProvisioningRequestBatchProcessing {
 			podListProcessor.AddProcessor(injector)
 		} else {
+			klog.Warning("ProvisioningRequest batch processing is enabled. The ProvisioningRequestPodsInjector processor will not be added to the list of processors.")
 			opts.ProvisioningRequestPodsInjector = injector
 		}
 		podListProcessor.AddProcessor(provreqProcesor)

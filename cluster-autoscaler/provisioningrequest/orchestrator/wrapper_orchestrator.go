@@ -33,6 +33,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/taints"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
+	"k8s.io/klog/v2"
 )
 
 // WrapperOrchestrator is an orchestrator which wraps Scale Up for ProvisioningRequests and regular pods.
@@ -51,7 +52,6 @@ func NewWrapperOrchestrator(provReqOrchestrator scaleup.Orchestrator) *WrapperOr
 	return &WrapperOrchestrator{
 		podsOrchestrator:    orchestrator.New(),
 		provReqOrchestrator: provReqOrchestrator,
-		
 	}
 }
 
@@ -85,6 +85,7 @@ func (o *WrapperOrchestrator) ScaleUp(
 	provReqPods, regularPods := []*apiv1.Pod{}, []*apiv1.Pod{}
 
 	if provisioningRequestBatchProcessing {
+		klog.Warning("Batch processing splitting of pods")
 		provReqPods, _ = provisioningRequestPodsInjector.Process(o.autoscalingContext, []*apiv1.Pod{})
 		// TODO: How to handle when provisioning request pod fetching doesn't work inside orchestrator
 		regularPods = unschedulablePods
@@ -93,6 +94,8 @@ func (o *WrapperOrchestrator) ScaleUp(
 		} else if len(unschedulablePods) == 0 {
 			o.scaleUpRegularPods = false
 		}
+		klog.Warning("provReqPods: ", provReqPods, ", regularPods: ", regularPods)
+		klog.Warning("scaleUpRegularPods: ", o.scaleUpRegularPods)
 	} else {
 		provReqPods, regularPods = splitOut(unschedulablePods)
 		if len(provReqPods) == 0 {
