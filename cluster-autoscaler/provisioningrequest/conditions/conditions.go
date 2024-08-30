@@ -39,7 +39,7 @@ const (
 	// CapacityIsProvisionedReason is added when capacity was requested successfully.
 	CapacityIsProvisionedReason = "CapacityIsProvisioned"
 	// CapacityIsProvisionedMsg is added when capacity was requested successfully.
-	CapacityIsProvisionedMsg = "Capacity is found in the cluster"
+	CapacityIsProvisionedMsg = "OSS CA: Capacity is found in the cluster"
 	// FailedToCheckCapacityReason is added when CA failed to check pre-existing capacity.
 	FailedToCheckCapacityReason = "FailedToCheckCapacity"
 	// FailedToCheckCapacityMsg is added when CA failed to check pre-existing capacity.

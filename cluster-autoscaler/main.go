@@ -501,7 +501,6 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 		DeleteOptions:        deleteOptions,
 		DrainabilityRules:    drainabilityRules,
 		ScaleUpOrchestrator:  orchestrator.New(),
-		ProvisioningRequestPodsInjector: nil,
 	}
 
 	opts.Processors = ca_processors.DefaultProcessors(autoscalingOptions)
@@ -532,12 +531,14 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 		if err != nil {
 			return nil, err
 		}
-		if !autoscalingOptions.ProvisioningRequestBatchProcessing {
-			podListProcessor.AddProcessor(injector)
-		} else {
-			klog.Warning("ProvisioningRequest batch processing is enabled. The ProvisioningRequestPodsInjector processor will not be added to the list of processors.")
-			opts.ProvisioningRequestPodsInjector = injector
+		
+		podListProcessor.AddProcessor(injector)
+		if autoscalingOptions.ProvisioningRequestBatchProcessing {
+			klog.Warning("ProvisioningRequest batch processing is enabled. The ProvisioningRequestPodsInjector processor will be passed down to the ScaleUpOrchestrator.")
+			klog.Warning("injector:", injector)
+			opts.ProvisioningRequestPodsInjector = &injector
 		}
+		
 		podListProcessor.AddProcessor(provreqProcesor)
 	}
 	opts.Processors.PodListProcessor = podListProcessor
@@ -589,6 +590,7 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 	metrics.UpdateMemoryLimitsBytes(autoscalingOptions.MinMemoryTotal, autoscalingOptions.MaxMemoryTotal)
 
 	// Create autoscaler.
+	klog.Warning("opts.ProvisioningRequestPodsInjector:", opts.ProvisioningRequestPodsInjector)
 	autoscaler, err := core.NewAutoscaler(opts, informerFactory)
 	if err != nil {
 		return nil, err

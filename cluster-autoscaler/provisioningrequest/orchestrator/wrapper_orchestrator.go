@@ -78,40 +78,26 @@ func (o *WrapperOrchestrator) ScaleUp(
 	provisioningRequestBatchProcessing bool,
 	provisioningRequestsPerLoop int,
 	provisioningRequestBatchProcessingTimebox time.Duration,
-	provisioningRequestPodsInjector pods.PodListProcessor,
+	provisioningRequestPodsInjector *pods.PodListProcessor,
 ) (*status.ScaleUpStatus, errors.AutoscalerError) {
 	defer func() { o.scaleUpRegularPods = !o.scaleUpRegularPods }()
 
-	provReqPods, regularPods := []*apiv1.Pod{}, []*apiv1.Pod{}
-
-	if provisioningRequestBatchProcessing {
-		klog.Warning("Batch processing splitting of pods")
-		provReqPods, _ = provisioningRequestPodsInjector.Process(o.autoscalingContext, []*apiv1.Pod{})
-		// TODO: How to handle when provisioning request pod fetching doesn't work inside orchestrator
-		regularPods = unschedulablePods
-		if len(provReqPods) == 0 {
-			o.scaleUpRegularPods = true
-		} else if len(unschedulablePods) == 0 {
-			o.scaleUpRegularPods = false
-		}
-		klog.Warning("provReqPods: ", provReqPods, ", regularPods: ", regularPods)
-		klog.Warning("scaleUpRegularPods: ", o.scaleUpRegularPods)
-	} else {
-		provReqPods, regularPods = splitOut(unschedulablePods)
-		if len(provReqPods) == 0 {
-			o.scaleUpRegularPods = true
-		} else if len(regularPods) == 0 {
-			o.scaleUpRegularPods = false
-		}
+	provReqPods, regularPods := splitOut(unschedulablePods)
+	if len(provReqPods) == 0 {
+		o.scaleUpRegularPods = true
+	} else if len(regularPods) == 0 {
+		o.scaleUpRegularPods = false
 	}
+
+	klog.Warning("provrReqPods: ", provReqPods, ", regularPods: ", regularPods)
+	klog.Warning("ScaleUp for regular pods: ", o.scaleUpRegularPods)
 
 	if o.scaleUpRegularPods {
 		return o.podsOrchestrator.ScaleUp(regularPods, nodes, daemonSets, nodeInfos, allOrNothing,provisioningRequestBatchProcessing, 0, 0 * time.Second, nil)
 	}
-	if provisioningRequestBatchProcessing {
-		return o.provReqOrchestrator.ScaleUp(provReqPods, nodes, daemonSets, nodeInfos, allOrNothing, provisioningRequestBatchProcessing, provisioningRequestsPerLoop, provisioningRequestBatchProcessingTimebox, provisioningRequestPodsInjector)
-	}
-	
+
+	klog.Warning("ScaleUp for provisioning request pods")
+	klog.Warning("ProvisioningRequestPodsInjector: ", provisioningRequestPodsInjector)
 	return o.provReqOrchestrator.ScaleUp(provReqPods, nodes, daemonSets, nodeInfos, allOrNothing, provisioningRequestBatchProcessing, provisioningRequestsPerLoop, provisioningRequestBatchProcessingTimebox, provisioningRequestPodsInjector)
 }
 

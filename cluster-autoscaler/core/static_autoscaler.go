@@ -99,7 +99,7 @@ type StaticAutoscaler struct {
 	processorCallbacks      *staticAutoscalerProcessorCallbacks
 	initialized             bool
 	taintConfig             taints.TaintConfig
-	provisioningRequestPodsInjector pods.PodListProcessor
+	provisioningRequestPodsInjector *pods.PodListProcessor
 }
 
 type staticAutoscalerProcessorCallbacks struct {
@@ -153,7 +153,7 @@ func NewStaticAutoscaler(
 	scaleUpOrchestrator scaleup.Orchestrator,
 	deleteOptions options.NodeDeleteOptions,
 	drainabilityRules rules.Rules,
-	provisioningRequestPodsInjector pods.PodListProcessor) *StaticAutoscaler {
+	provisioningRequestPodsInjector *pods.PodListProcessor) *StaticAutoscaler {
 
 	clusterStateConfig := clusterstate.ClusterStateRegistryConfig{
 		MaxTotalUnreadyPercentage: opts.MaxTotalUnreadyPercentage,
@@ -221,6 +221,7 @@ func NewStaticAutoscaler(
 		processorCallbacks:      processorCallbacks,
 		clusterStateRegistry:    clusterStateRegistry,
 		taintConfig:             taintConfig,
+		provisioningRequestPodsInjector: provisioningRequestPodsInjector,
 	}
 }
 
@@ -578,8 +579,10 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 	} else {
 		scaleUpStart := preScaleUp()
 		klog.Warning("Starting scale up")
+		klog.Warning("ProvisioningRequestPodsInjector: ", a.provisioningRequestPodsInjector)
 		scaleUpStatus, typedErr = a.scaleUpOrchestrator.ScaleUp(unschedulablePodsToHelp, readyNodes, daemonsets, nodeInfosForGroups, false, a.ProvisioningRequestBatchProcessing, a.ProvisioningRequestsPerLoop, a.ProvisioningRequestBatchProcessingTimebox, a.provisioningRequestPodsInjector)
 		if exit, err := postScaleUp(scaleUpStart); exit {
+			klog.Warning("Exiting loop after scale up")
 			return err
 		}
 	}

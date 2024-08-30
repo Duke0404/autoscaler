@@ -92,6 +92,8 @@ func (o *bestEffortAtomicProvClass) Provision(
 	// Pick 1 ProvisioningRequest.
 	pr := prs[0]
 
+	klog.Warning("Started Provisioning ProvisioningRequest: ", pr.Namespace, "/", pr.Name)
+
 	o.context.ClusterSnapshot.Fork()
 	defer o.context.ClusterSnapshot.Revert()
 
@@ -105,15 +107,19 @@ func (o *bestEffortAtomicProvClass) Provision(
 		return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
 	}
 
+	klog.Warning("Actually unschedulable pods: ", actuallyUnschedulablePods)
+
 	if len(actuallyUnschedulablePods) == 0 {
 		// Nothing to do here - everything fits without scale-up.
 		conditions.AddOrUpdateCondition(pr, v1.Provisioned, metav1.ConditionTrue, conditions.CapacityIsFoundReason, conditions.CapacityIsFoundMsg, metav1.Now())
 		if _, updateErr := o.client.UpdateProvisioningRequest(pr.ProvisioningRequest); updateErr != nil {
 			klog.Errorf("failed to add Provisioned=true condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
-			return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "capacity available, but failed to admit workload: %s", updateErr.Error()))
+			return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "OSS CA: capacity available, but failed to admit workload: %s", updateErr.Error()))
 		}
 		return &status.ScaleUpStatus{Result: status.ScaleUpNotNeeded}, nil
 	}
+
+	klog.Warning("Starting to scale up for ProvisioningRequest: ", pr.Namespace, "/", pr.Name)
 
 	st, err := o.scaleUpOrchestrator.ScaleUp(actuallyUnschedulablePods, nodes, daemonSets, nodeInfos, true, false, 0, 0*time.Second, nil)
 	if err == nil && st.Result == status.ScaleUpSuccessful {
@@ -123,11 +129,17 @@ func (o *bestEffortAtomicProvClass) Provision(
 			klog.Errorf("failed to add Provisioned=true condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
 			return st, errors.NewAutoscalerError(errors.InternalError, "scale up requested, but failed to admit workload: %s", updateErr.Error())
 		}
+
+		klog.Warning("Happy path for ProvisioningRequest: ", pr.Namespace, "/", pr.Name)
+		klog.Warning("ScaleUpStatus: ", st)
 		return st, nil
 	}
 
+	klog.Warning("Unhappy path for ProvisioningRequest: ", pr.Namespace, "/", pr.Name)
+	klog.Warning("ScaleUpStatus: ", st)
+
 	// We are not happy with the results.
-	conditions.AddOrUpdateCondition(pr, v1.Provisioned, metav1.ConditionFalse, conditions.CapacityIsNotFoundReason, "Capacity is not found, CA will try to find it later.", metav1.Now())
+	conditions.AddOrUpdateCondition(pr, v1.Provisioned, metav1.ConditionFalse, conditions.CapacityIsNotFoundReason, "OSS CA: Capacity is not found, CA will try to find it later.", metav1.Now())
 	if _, updateErr := o.client.UpdateProvisioningRequest(pr.ProvisioningRequest); updateErr != nil {
 		klog.Errorf("failed to add Provisioned=false condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, updateErr)
 	}

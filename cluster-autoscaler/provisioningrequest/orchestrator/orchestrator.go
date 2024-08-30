@@ -90,11 +90,13 @@ func (o *provReqOrchestrator) ScaleUp(
 	provisioningrequestBatchProcessing bool,
 	provisioningRequestsPerLoop int,
 	provisioningRequestBatchProcessingTimebox time.Duration,
-	provisioningRequestPodsInjector pods.PodListProcessor,
+	provisioningRequestPodsInjector *pods.PodListProcessor,
 ) (*status.ScaleUpStatus, ca_errors.AutoscalerError) {
 	if !o.initialized {
 		return &status.ScaleUpStatus{}, ca_errors.ToAutoscalerError(ca_errors.InternalError, fmt.Errorf("provisioningrequest.Orchestrator is not initialized"))
 	}
+
+	klog.Warning("ProvisioningRequest ScaleUp cluster snapshot before processing provisioning requests: ", o.context.ClusterSnapshot)
 
 	o.context.ClusterSnapshot.Fork()
 	defer o.context.ClusterSnapshot.Revert()
@@ -102,6 +104,8 @@ func (o *provReqOrchestrator) ScaleUp(
 	combinedStatus := &status.ScaleUpStatus{Result: status.ScaleUpNotTried}
 	provisioningRequestsProcessed := 0
 	startTime := time.Now()
+
+	klog.Warningf("New PR batch loop started at %v", startTime)
 
 	// unschedulablePods pods should belong to one ProvisioningClass, so only one provClass should try to ScaleUp.
 	// for _, provClass := range o.provisioningClasses {
@@ -127,41 +131,56 @@ func (o *provReqOrchestrator) ScaleUp(
 
 	// return combinedStatus, nil // TODO: Refactor to return combined status. Maybe create new status which indicates partial success.
 
+	temp := o.context.ClusterSnapshot
+	defer func() {
+		o.context.ClusterSnapshot = temp
+	} ()
+
 	for len(unschedulablePods) > 0 {
+		klog.Warning("PR batch loop iteration started. LOOK AT THIS!!!")
+
 		// unschedulablePods pods should belong to one ProvisioningClass, so only one provClass should try to ScaleUp.
 		for _, provClass := range o.provisioningClasses {
 			st, err := provClass.Provision(unschedulablePods, nodes, daemonSets, nodeInfos)
-			if err != nil || st != nil && st.Result != status.ScaleUpNotTried {
-				return st, err
-			} else if st != nil && st.Result == status.ScaleUpSuccessful {
+
+			klog.Warning("Provisioning Status returned: ", st, err)
+
+			if err != nil || (st != nil && st.Result != status.ScaleUpNotTried && st.Result != status.ScaleUpSuccessful) {
+				return combinedStatus, nil
+			}
+			
+			if st != nil && st.Result == status.ScaleUpSuccessful {
 				combinedStatus = st
 
-				klog.Warning(st.SuccessfulSnapshot)
-
 				st.SuccessfulSnapshot.Rebase(o.context.ClusterSnapshot)
-
-				klog.Warning(st.SuccessfulSnapshot)
 
 				o.context.ClusterSnapshot = st.SuccessfulSnapshot
 				o.context.ClusterSnapshot.Commit()
 
-				klog.Warning(o.context.ClusterSnapshot)
-
+				unschedulablePods = nil
 				break
 			}
 		}
 
+		klog.Warning(provisioningRequestsProcessed, provisioningRequestsPerLoop, time.Since(startTime), provisioningRequestBatchProcessingTimebox)
+
 		provisioningRequestsProcessed++
 		if provisioningRequestsProcessed >= provisioningRequestsPerLoop && time.Since(startTime) >= provisioningRequestBatchProcessingTimebox {
+			klog.Warning("PR batch loop iteration finished due to timebox. LOOK AT THIS!!!")
 			break
 		}
 
+		klog.Warning("provisioningRequestPodsInjector: ", provisioningRequestPodsInjector)
+
 		// Add unshedulable pods from the next provisioning request to the list of unschedulable pods
 		var err error
-		unschedulablePods, err = provisioningRequestPodsInjector.Process(o.context, unschedulablePods)
+		unschedulablePods, err = (*provisioningRequestPodsInjector).Process(o.context, unschedulablePods)
 		if err != nil {
 			return &status.ScaleUpStatus{}, ca_errors.ToAutoscalerError(ca_errors.InternalError, err)
 		}
+
+		klog.Warning(unschedulablePods)
+		klog.Warning("PR batch loop iteration finished. LOOK AT THIS!!!")
 	}
 
 	klog.Warningf("%d provisioning requests processed in this loop that took %v", provisioningRequestsProcessed, time.Since(startTime))

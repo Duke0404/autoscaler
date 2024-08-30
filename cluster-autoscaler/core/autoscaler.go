@@ -62,7 +62,7 @@ type AutoscalerOptions struct {
 	ScaleUpOrchestrator    scaleup.Orchestrator
 	DeleteOptions          options.NodeDeleteOptions
 	DrainabilityRules      rules.Rules
-	ProvisioningRequestPodsInjector pods.PodListProcessor
+	ProvisioningRequestPodsInjector *pods.PodListProcessor
 }
 
 // Autoscaler is the main component of CA which scales up/down node groups according to its configuration

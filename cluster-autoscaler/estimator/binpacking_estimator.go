@@ -18,6 +18,7 @@ package estimator
 
 import (
 	"fmt"
+	"time"
 
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
@@ -201,7 +202,7 @@ func (e *BinpackingNodeEstimator) tryToScheduleOnNewNodes(
 			if err := e.predicateChecker.CheckPredicates(e.clusterSnapshot, pod, estimationState.lastNodeName); err != nil {
 				break
 			}
-			if err := e.tryToAddNode(estimationState, pod, estimationState.lastNodeName); err != nil {
+			if err := e.tryToAddNode(estimationState, pod, estimationState.lastNodeName ); err != nil {
 				return err
 			}
 		}
@@ -213,7 +214,7 @@ func (e *BinpackingNodeEstimator) addNewNodeToSnapshot(
 	estimationState *estimationState,
 	template *schedulerframework.NodeInfo,
 ) error {
-	newNodeInfo := scheduler.DeepCopyTemplateNode(template, fmt.Sprintf("e-%d", estimationState.newNodeNameIndex))
+	newNodeInfo := scheduler.DeepCopyTemplateNode(template, fmt.Sprintf("e-%d-%d", estimationState.newNodeNameIndex, time.Now().Unix()))
 	var pods []*apiv1.Pod
 	for _, podInfo := range newNodeInfo.Pods {
 		pods = append(pods, podInfo.Pod)
@@ -222,7 +223,7 @@ func (e *BinpackingNodeEstimator) addNewNodeToSnapshot(
 		return err
 	}
 	estimationState.newNodeNameIndex++
-	estimationState.lastNodeName = newNodeInfo.Node().Name
+	estimationState.lastNodeName = newNodeInfo.Node().Name// + string(time.Now().Unix())
 	estimationState.newNodeNames[estimationState.lastNodeName] = true
 	return nil
 }

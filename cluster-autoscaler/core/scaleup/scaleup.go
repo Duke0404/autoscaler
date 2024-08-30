@@ -55,7 +55,7 @@ type Orchestrator interface {
 		provisioningRequestBatchProcessing bool,
 		provisioningRequestsPerLoop int,
 		provisioningRequestBatchProcessingTimebox time.Duration,
-		provisioningRequestPodsInjector pods.PodListProcessor,
+		provisioningRequestPodsInjector *pods.PodListProcessor,
 	) (*status.ScaleUpStatus, errors.AutoscalerError)
 	// ScaleUpToNodeGroupMinSize tries to scale up node groups that have less nodes
 	// than the configured min size. The source of truth for the current node group

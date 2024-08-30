@@ -78,7 +78,7 @@ func (f *fakeScaleUp) ScaleUp(
 	provisioningRequestBatchProcessing bool,
 	provisioningRequestsPerLoop int,
 	provisioningRequestBatchProcessingTimebox time.Duration,
-	provisioningRequestPodsInjector pods.PodListProcessor,
+	provisioningRequestPodsInjector *pods.PodListProcessor,
 ) (*status.ScaleUpStatus, errors.AutoscalerError) {
 	return nil, errors.NewAutoscalerError(errors.InternalError, f.errorMsg)
 }
