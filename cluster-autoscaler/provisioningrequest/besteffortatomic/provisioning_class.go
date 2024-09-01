@@ -81,6 +81,8 @@ func (o *bestEffortAtomicProvClass) Provision(
 	nodeInfos map[string]*schedulerframework.NodeInfo,
 
 ) (*status.ScaleUpStatus, errors.AutoscalerError) {
+	klog.Warning("Unschedulable pods received by bestEffortAtomicProvClass: ", unschedulablePods)
+
 	if len(unschedulablePods) == 0 {
 		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
 	}
