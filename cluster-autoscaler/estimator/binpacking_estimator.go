@@ -214,7 +214,7 @@ func (e *BinpackingNodeEstimator) addNewNodeToSnapshot(
 	estimationState *estimationState,
 	template *schedulerframework.NodeInfo,
 ) error {
-	newNodeInfo := scheduler.DeepCopyTemplateNode(template, fmt.Sprintf("e-%d-%d", estimationState.newNodeNameIndex, time.Now().Unix()))
+	newNodeInfo := scheduler.DeepCopyTemplateNode(template, fmt.Sprintf("e-%d-%d", estimationState.newNodeNameIndex, time.Now().UnixMicro()))
 	var pods []*apiv1.Pod
 	for _, podInfo := range newNodeInfo.Pods {
 		pods = append(pods, podInfo.Pod)
