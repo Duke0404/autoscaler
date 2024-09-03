@@ -295,6 +295,12 @@ type AutoscalingOptions struct {
 	ProvisioningRequestEnabled bool
 	// AsyncNodeGroupsEnabled tells if CA creates/deletes node groups asynchronously.
 	AsyncNodeGroupsEnabled bool
+	// CheckCapacityBatchProcessing is used to enable/disable batch processing of check capacity provisioning class
+	CheckCapacityBatchProcessing bool
+	// MaxBatchSize is the maximum number of provisioning requests to process in a single batch
+	MaxBatchSize int
+	// BatchTimebox is the maximum time to spend processing a batch of provisioning requests
+	BatchTimebox time.Duration
 }
 
 // KubeClientOptions specify options for kube client
