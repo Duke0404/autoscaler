@@ -276,7 +276,7 @@ var (
 	podInjectionLimit            = flag.Int("pod-injection-limit", 5000, "Limits total number of pods while injecting fake pods. If unschedulable pods already exceeds the limit, pod injection is disabled but pods are not truncated.")
 	checkCapacityBatchProcessing = flag.Bool("check-capacity-batch-processing", false, "Whether to enable batch processing for check capacity requests.")
 	maxBatchSize                 = flag.Int("max-batch-size", 10, "Maximum number of provisioning requests to process in a single batch.")
-	batchTimebox                 = flag.Duration("batch-timebox", 5*time.Minutes, "Maximum time to process a batch of provisioning requests.")
+	batchTimebox                 = flag.Duration("batch-timebox", 5*time.Minute, "Maximum time to process a batch of provisioning requests.")
 )
 
 func isFlagPassed(name string) bool {
@@ -518,23 +518,28 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 		if err != nil {
 			return nil, err
 		}
-		provreqOrchestrator := provreqorchestrator.New(client, []provreqorchestrator.ProvisioningClass{
-			checkcapacity.New(client),
-			besteffortatomic.New(client),
-		})
-		scaleUpOrchestrator := provreqorchestrator.NewWrapperOrchestrator(provreqOrchestrator)
-
-		opts.ScaleUpOrchestrator = scaleUpOrchestrator
-		provreqProcesor := provreq.NewProvReqProcessor(client, opts.PredicateChecker)
-		if err != nil {
-			return nil, err
-		}
-		opts.LoopStartNotifier = loopstart.NewObserversList([]loopstart.Observer{provreqProcesor})
+		
 		injector, err := provreq.NewProvisioningRequestPodsInjector(restConfig)
 		if err != nil {
 			return nil, err
 		}
 		podListProcessor.AddProcessor(injector)
+		var provisioningRequestPodsInjector *provreq.ProvisioningRequestPodsInjector
+		if autoscalingOptions.CheckCapacityBatchProcessing {
+			klog.Infof("Batch processing for check capacity requests is enabled. Passing provisioning request injector to check capacity processor.")
+			provisioningRequestPodsInjector = injector
+		}
+
+		provreqOrchestrator := provreqorchestrator.New(client, []provreqorchestrator.ProvisioningClass{
+			checkcapacity.New(client, provisioningRequestPodsInjector),
+			besteffortatomic.New(client),
+		})
+
+		scaleUpOrchestrator := provreqorchestrator.NewWrapperOrchestrator(provreqOrchestrator)
+		opts.ScaleUpOrchestrator = scaleUpOrchestrator
+		provreqProcesor := provreq.NewProvReqProcessor(client, opts.PredicateChecker)
+		opts.LoopStartNotifier = loopstart.NewObserversList([]loopstart.Observer{provreqProcesor})
+		
 		podListProcessor.AddProcessor(provreqProcesor)
 	}
 

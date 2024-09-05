@@ -18,6 +18,7 @@ package checkcapacity
 
 import (
 	"fmt"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -26,6 +27,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/clusterstate"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
 	"k8s.io/autoscaler/cluster-autoscaler/estimator"
+	"k8s.io/autoscaler/cluster-autoscaler/processors/provreq"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/status"
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/conditions"
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/provreqclient"
@@ -33,22 +35,28 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/scheduling"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/taints"
+	"k8s.io/klog/v2"
 
 	ca_processors "k8s.io/autoscaler/cluster-autoscaler/processors"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 type checkCapacityProvClass struct {
-	context  *context.AutoscalingContext
-	client   *provreqclient.ProvisioningRequestClient
-	injector *scheduling.HintingSimulator
+	context                      *context.AutoscalingContext
+	client                       *provreqclient.ProvisioningRequestClient
+	injector                     *scheduling.HintingSimulator
+	batchProcessing 			bool
+	maxBatchSize                 int
+	batchTimebox                 time.Duration
+	provisioningRequestPodsInjector *provreq.ProvisioningRequestPodsInjector
 }
 
 // New create check-capacity scale-up mode.
 func New(
 	client *provreqclient.ProvisioningRequestClient,
+	provisioningRequestPodsInjector *provreq.ProvisioningRequestPodsInjector,
 ) *checkCapacityProvClass {
-	return &checkCapacityProvClass{client: client}
+	return &checkCapacityProvClass{client: client, provisioningRequestPodsInjector: provisioningRequestPodsInjector}
 }
 
 func (o *checkCapacityProvClass) Initialize(
@@ -61,6 +69,9 @@ func (o *checkCapacityProvClass) Initialize(
 ) {
 	o.context = autoscalingContext
 	o.injector = injector
+	o.batchProcessing = autoscalingContext.CheckCapacityBatchProcessing
+	o.batchTimebox = autoscalingContext.BatchTimebox
+	o.maxBatchSize = autoscalingContext.MaxBatchSize
 }
 
 // Provision return if there is capacity in the cluster for pods from ProvisioningRequest.
@@ -70,28 +81,68 @@ func (o *checkCapacityProvClass) Provision(
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
 ) (*status.ScaleUpStatus, errors.AutoscalerError) {
-	if len(unschedulablePods) == 0 {
-		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
-	}
+	combinedStatus := []*status.ScaleUpStatus{}
+	provisioningRequestsProcessed := 0
+	startTime := time.Now()
 
-	prs := provreqclient.ProvisioningRequestsForPods(o.client, unschedulablePods)
-	prs = provreqclient.FilterOutProvisioningClass(prs, v1.ProvisioningClassCheckCapacity)
-	if len(prs) == 0 {
-		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
-	}
-	// Pick 1 ProvisioningRequest.
-	pr := prs[0]
 	o.context.ClusterSnapshot.Fork()
 	defer o.context.ClusterSnapshot.Revert()
 
-	scaleUpIsSuccessful, err := o.checkcapacity(unschedulablePods, pr)
-	if err != nil {
-		return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
+	for len(unschedulablePods) > 0 {
+		prs := provreqclient.ProvisioningRequestsForPods(o.client, unschedulablePods)
+		prs = provreqclient.FilterOutProvisioningClass(prs, v1.ProvisioningClassCheckCapacity)
+		if len(prs) == 0 {
+			break
+		}
+
+		// Pick 1 ProvisioningRequest.
+		pr := prs[0]
+
+		scaleUpIsSuccessful, err := o.checkcapacity(unschedulablePods, pr)
+		if err != nil {
+			return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
+		}
+		if scaleUpIsSuccessful {
+			combinedStatus = append(combinedStatus, &status.ScaleUpStatus{Result: status.ScaleUpSuccessful})
+		} else {
+			combinedStatus = append(combinedStatus, &status.ScaleUpStatus{Result: status.ScaleUpNoOptionsAvailable})
+		}
+
+		if !o.batchProcessing {
+			break
+		}
+
+		if o.provisioningRequestPodsInjector == nil {
+			klog.Errorf("ProvisioningRequestPodsInjector is not set, falling back to non-batch processing")
+			break
+		}
+
+		if o.maxBatchSize <= 1 {
+			klog.Errorf("MaxBatchSize is set to %d, falling back to non-batch processing", o.maxBatchSize)
+			break
+		}
+
+		provisioningRequestsProcessed++
+		if provisioningRequestsProcessed >= o.maxBatchSize {
+			break
+		}
+
+		if time.Since(startTime) > o.batchTimebox {
+			klog.Infof("Batch timebox exceeded, processed %d check capacity provisioning requests", provisioningRequestsProcessed)
+			break
+		}
+
+		unschedulablePods, err = (*o.provisioningRequestPodsInjector).GetPodsFromNextRequest(func(pr *provreqwrapper.ProvisioningRequest) bool {return pr.Spec.ProvisioningClassName == v1.ProvisioningClassCheckCapacity})
+		if err != nil {
+			return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
+		}
 	}
-	if scaleUpIsSuccessful {
-		return &status.ScaleUpStatus{Result: status.ScaleUpSuccessful}, nil
+
+	if len(combinedStatus) == 0 {
+		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
 	}
-	return &status.ScaleUpStatus{Result: status.ScaleUpNoOptionsAvailable}, nil
+
+	return combinedStatus[len(combinedStatus) - 1], nil
 }
 
 // Assuming that all unschedulable pods comes from one ProvisioningRequest.
