@@ -81,7 +81,7 @@ func (o *checkCapacityProvClass) Provision(
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
 ) (*status.ScaleUpStatus, errors.AutoscalerError) {
-	combinedStatus := []*status.ScaleUpStatus{}
+	combinedStatus := status.NewCombinedStatusSet()
 	provisioningRequestsProcessed := 0
 	startTime := time.Now()
 

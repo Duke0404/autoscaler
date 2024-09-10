@@ -106,3 +106,213 @@ func UpdateScaleUpError(s *ScaleUpStatus, err errors.AutoscalerError) (*ScaleUpS
 	s.Result = ScaleUpError
 	return s, err
 }
+
+type combinedStatusSet struct {
+	ScaleupErrors map[*errors.AutoscalerError]bool
+	ScaleUpInfosSet map[nodegroupset.ScaleUpInfo]bool
+	PodsTriggeredScaleUpSet map[*apiv1.Pod]bool
+	PodsRemainUnschedulableSet map[*NoScaleUpInfo]bool
+	PodsAwaitEvaluationSet map[*apiv1.Pod]bool
+	CreateNodeGroupResultsSet map[*nodegroups.CreateNodeGroupResult]bool
+	ConsideredNodeGroupsSet map[cloudprovider.NodeGroup]bool
+	FailedCreationNodeGroupsSet map[cloudprovider.NodeGroup]bool
+	FailedResizeNodeGroupsSet map[cloudprovider.NodeGroup]bool
+}
+
+func (c *combinedStatusSet) Add(status *ScaleUpStatus) {
+	if status.ScaleUpError != nil {
+		if _, found := c.ScaleupErrors[status.ScaleUpError]; !found {
+			c.ScaleupErrors[status.ScaleUpError] = true
+		}
+	}
+	if status.ScaleUpInfos != nil {
+		for _, scaleUpInfo := range status.ScaleUpInfos {
+			if _, found := c.ScaleUpInfosSet[scaleUpInfo]; !found {
+				c.ScaleUpInfosSet[scaleUpInfo] = true
+			}
+		}
+	}
+	if status.PodsTriggeredScaleUp != nil {
+		for _, pod := range status.PodsTriggeredScaleUp {
+			if _, found := c.PodsTriggeredScaleUpSet[pod]; !found {
+				c.PodsTriggeredScaleUpSet[pod] = true
+			}
+		}
+	}
+	if status.PodsRemainUnschedulable != nil {
+		for _, pod := range status.PodsRemainUnschedulable {
+			if _, found := c.PodsRemainUnschedulableSet[&pod]; !found {
+				c.PodsRemainUnschedulableSet[&pod] = true
+			}
+		}
+	}
+	if status.PodsAwaitEvaluation != nil {
+		for _, pod := range status.PodsAwaitEvaluation {
+			if _, found := c.PodsAwaitEvaluationSet[pod]; !found {
+				c.PodsAwaitEvaluationSet[pod] = true
+			}
+		}
+	}
+	if status.CreateNodeGroupResults != nil {
+		for _, createNodeGroupResult := range status.CreateNodeGroupResults {
+			if _, found := c.CreateNodeGroupResultsSet[&createNodeGroupResult]; !found {
+				c.CreateNodeGroupResultsSet[&createNodeGroupResult] = true
+			}
+		}
+	}
+	if status.ConsideredNodeGroups != nil {
+		for _, nodeGroup := range status.ConsideredNodeGroups {
+			if _, found := c.ConsideredNodeGroupsSet[nodeGroup]; !found {
+				c.ConsideredNodeGroupsSet[nodeGroup] = true
+			}
+		}
+	}
+	if status.FailedCreationNodeGroups != nil {
+		for _, nodeGroup := range status.FailedCreationNodeGroups {
+			if _, found := c.FailedCreationNodeGroupsSet[nodeGroup]; !found {
+				c.FailedCreationNodeGroupsSet[nodeGroup] = true
+			}
+		}
+	}
+	if status.FailedResizeNodeGroups != nil {
+		for _, nodeGroup := range status.FailedResizeNodeGroups {
+			if _, found := c.FailedResizeNodeGroupsSet[nodeGroup]; !found {
+				c.FailedResizeNodeGroupsSet[nodeGroup] = true
+			}
+		}
+	}
+}
+
+/*
+func combineConcurrentScaleUpErrors(errs []errors.AutoscalerError) errors.AutoscalerError {
+	if len(errs) == 0 {
+		return nil
+	}
+	if len(errs) == 1 {
+		return errs[0]
+	}
+	uniqueMessages := make(map[string]bool)
+	uniqueTypes := make(map[errors.AutoscalerErrorType]bool)
+	for _, err := range errs {
+		uniqueTypes[err.Type()] = true
+		uniqueMessages[err.Error()] = true
+	}
+	if len(uniqueTypes) == 1 && len(uniqueMessages) == 1 {
+		return errs[0]
+	}
+	// sort to stabilize the results and easier log aggregation
+	sort.Slice(errs, func(i, j int) bool {
+		errA := errs[i]
+		errB := errs[j]
+		if errA.Type() == errB.Type() {
+			return errs[i].Error() < errs[j].Error()
+		}
+		return errA.Type() < errB.Type()
+	})
+	firstErr := errs[0]
+	printErrorTypes := len(uniqueTypes) > 1
+	message := formatMessageFromConcurrentErrors(errs, printErrorTypes)
+	return errors.NewAutoscalerError(firstErr.Type(), message)
+}
+*/
+
+func (c *combinedStatusSet) combineBatchScaleUpErrors() *errors.AutoscalerError {
+	if len(c.ScaleupErrors) == 0 {
+		return nil
+	}
+	if len(c.ScaleupErrors) == 1 {
+		for err := range c.ScaleupErrors {
+			return err
+		}
+	}
+	uniqueMessages := make(map[string]bool)
+	uniqueTypes := make(map[errors.AutoscalerErrorType]bool)
+	for err := range c.ScaleupErrors {
+		uniqueTypes[err.Type()] = true
+		uniqueMessages[err.Error()] = true
+	}
+	if len(uniqueTypes) == 1 && len(uniqueMessages) == 1 {
+		for err := range c.ScaleupErrors {
+			return err
+		}
+	}
+	// sort to stabilize the results and easier log aggregation
+	errs := make([]errors.AutoscalerError, 0, len(c.ScaleupErrors))
+	for err := range c.ScaleupErrors {
+		errs = append(errs, *err)
+	}
+	sort.Slice(errs, func(i, j int) bool {
+		errA := errs[i]
+		errB := errs[j]
+		if errA.Type() == errB.Type() {
+			return errs[i].Error() < errs[j].Error()
+		}
+		return errA.Type() < errB.Type()
+	})
+	firstErr := errs[0]
+	printErrorTypes := len(uniqueTypes) > 1
+	message := formatMessageFromConcurrentErrors(errs, printErrorTypes)
+	return errors.NewAutoscalerError(firstErr.Type(), message)
+}
+
+func (c *combinedStatusSet) Export() *ScaleUpStatus {
+	result := &ScaleUpStatus{}
+	if len(c.ScaleupErrors) > 0 {
+		result.ScaleUpError = c.ScaleupErrors
+	}
+	if len(c.ScaleUpInfosSet) > 0 {
+		for scaleUpInfo := range c.ScaleUpInfosSet {
+			result.ScaleUpInfos = append(result.ScaleUpInfos, scaleUpInfo)
+		}
+	}
+	if len(c.PodsTriggeredScaleUpSet) > 0 {
+		for pod := range c.PodsTriggeredScaleUpSet {
+			result.PodsTriggeredScaleUp = append(result.PodsTriggeredScaleUp, pod)
+		}
+	}
+	if len(c.PodsRemainUnschedulableSet) > 0 {
+		for pod := range c.PodsRemainUnschedulableSet {
+			result.PodsRemainUnschedulable = append(result.PodsRemainUnschedulable, *pod)
+		}
+	}
+	if len(c.PodsAwaitEvaluationSet) > 0 {
+		for pod := range c.PodsAwaitEvaluationSet {
+			result.PodsAwaitEvaluation = append(result.PodsAwaitEvaluation, pod)
+		}
+	}
+	if len(c.CreateNodeGroupResultsSet) > 0 {
+		for createNodeGroupResult := range c.CreateNodeGroupResultsSet {
+			result.CreateNodeGroupResults = append(result.CreateNodeGroupResults, *createNodeGroupResult)
+		}
+	}
+	if len(c.ConsideredNodeGroupsSet) > 0 {
+		for nodeGroup := range c.ConsideredNodeGroupsSet {
+			result.ConsideredNodeGroups = append(result.ConsideredNodeGroups, nodeGroup)
+		}
+	}
+	if len(c.FailedCreationNodeGroupsSet) > 0 {
+		for nodeGroup := range c.FailedCreationNodeGroupsSet {
+			result.FailedCreationNodeGroups = append(result.FailedCreationNodeGroups, nodeGroup)
+		}
+	}
+	if len(c.FailedResizeNodeGroupsSet) > 0 {
+		for nodeGroup := range c.FailedResizeNodeGroupsSet {
+			result.FailedResizeNodeGroups = append(result.FailedResizeNodeGroups, nodeGroup)
+		}
+	}
+	return result
+}
+
+func NewCombinedStatusSet() combinedStatusSet {
+	return combinedStatusSet{
+		ScaleupErrors: make(map[*errors.AutoscalerError]bool),
+		ScaleUpInfosSet: make(map[nodegroupset.ScaleUpInfo]bool),
+		PodsTriggeredScaleUpSet: make(map[*apiv1.Pod]bool),
+		PodsRemainUnschedulableSet: make(map[*NoScaleUpInfo]bool),
+		PodsAwaitEvaluationSet: make(map[*apiv1.Pod]bool),
+		CreateNodeGroupResultsSet: make(map[*nodegroups.CreateNodeGroupResult]bool),
+		ConsideredNodeGroupsSet: make(map[cloudprovider.NodeGroup]bool),
+		FailedCreationNodeGroupsSet: make(map[cloudprovider.NodeGroup]bool),
+		FailedResizeNodeGroupsSet: make(map[cloudprovider.NodeGroup]bool),
+	}
+}
