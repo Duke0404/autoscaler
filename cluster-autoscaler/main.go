@@ -519,7 +519,7 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 		if err != nil {
 			return nil, err
 		}
-		
+
 		injector, err := provreq.NewProvisioningRequestPodsInjector(restConfig)
 		if err != nil {
 			return nil, err
@@ -540,7 +540,7 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 		opts.ScaleUpOrchestrator = scaleUpOrchestrator
 		provreqProcesor := provreq.NewProvReqProcessor(client, opts.PredicateChecker)
 		opts.LoopStartNotifier = loopstart.NewObserversList([]loopstart.Observer{provreqProcesor})
-		
+
 		podListProcessor.AddProcessor(provreqProcesor)
 	}
 
