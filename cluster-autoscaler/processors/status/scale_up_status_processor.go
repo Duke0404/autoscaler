@@ -17,6 +17,10 @@ limitations under the License.
 package status
 
 import (
+	"sort"
+	"fmt"
+	"strings"
+
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 
@@ -214,13 +218,80 @@ func combineConcurrentScaleUpErrors(errs []errors.AutoscalerError) errors.Autosc
 	message := formatMessageFromConcurrentErrors(errs, printErrorTypes)
 	return errors.NewAutoscalerError(firstErr.Type(), message)
 }
+
+func formatMessageFromConcurrentErrors(errs []errors.AutoscalerError, printErrorTypes bool) string {
+	firstErr := errs[0]
+	var builder strings.Builder
+	builder.WriteString(firstErr.Error())
+	builder.WriteString(" ...and other concurrent errors: [")
+	formattedErrs := map[errors.AutoscalerError]bool{
+		firstErr: true,
+	}
+	for _, err := range errs {
+		if _, has := formattedErrs[err]; has {
+			continue
+		}
+		formattedErrs[err] = true
+		var message string
+		if printErrorTypes {
+			message = fmt.Sprintf("[%s] %s", err.Type(), err.Error())
+		} else {
+			message = err.Error()
+		}
+		if len(formattedErrs) > 2 {
+			builder.WriteString(", ")
+		}
+		builder.WriteString(fmt.Sprintf("%q", message))
+	}
+	builder.WriteString("]")
+	return builder.String()
+}
 */
+
+func (c *combinedStatusSet) formatMessageFromBatchErrors(errs []errors.AutoscalerError, printErrorTypes bool) string {
+	firstErr := errs[0]
+	var builder strings.Builder
+	builder.WriteString(firstErr.Error())
+	builder.WriteString(" ...and other concurrent errors: [")
+	formattedErrs := map[errors.AutoscalerError]bool{
+		firstErr: true,
+	}
+	for _, err := range errs {
+		if _, has := formattedErrs[err]; has {
+			continue
+		}
+		formattedErrs[err] = true
+		var message string
+		if printErrorTypes {
+			message = fmt.Sprintf("[%s] %s", err.Type(), err.Error())
+		} else {
+			message = err.Error()
+		}
+		if len(formattedErrs) > 2 {
+			builder.WriteString(", ")
+		}
+		builder.WriteString(fmt.Sprintf("%q", message))
+	}
+	builder.WriteString("]")
+	return builder.String()
+}
 
 func (c *combinedStatusSet) combineBatchScaleUpErrors() *errors.AutoscalerError {
 	if len(c.ScaleupErrors) == 0 {
 		return nil
 	}
 	if len(c.ScaleupErrors) == 1 {
+		for err := range c.ScaleupErrors {
+			return err
+		}
+	}
+	uniqueMessages := make(map[string]bool)
+	uniqueTypes := make(map[errors.AutoscalerErrorType]bool)
+	for err := range c.ScaleupErrors {
+		uniqueTypes[(*err).Type()] = true
+		uniqueMessages[(*err).Error()] = true
+	}
+	if len(uniqueTypes) == 1 && len(uniqueMessages) == 1 {
 		for err := range c.ScaleupErrors {
 			return err
 		}
