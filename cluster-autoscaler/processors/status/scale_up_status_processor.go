@@ -225,17 +225,6 @@ func (c *combinedStatusSet) combineBatchScaleUpErrors() *errors.AutoscalerError 
 			return err
 		}
 	}
-	uniqueMessages := make(map[string]bool)
-	uniqueTypes := make(map[errors.AutoscalerErrorType]bool)
-	for err := range c.ScaleupErrors {
-		uniqueTypes[err.Type()] = true
-		uniqueMessages[err.Error()] = true
-	}
-	if len(uniqueTypes) == 1 && len(uniqueMessages) == 1 {
-		for err := range c.ScaleupErrors {
-			return err
-		}
-	}
 	// sort to stabilize the results and easier log aggregation
 	errs := make([]errors.AutoscalerError, 0, len(c.ScaleupErrors))
 	for err := range c.ScaleupErrors {
