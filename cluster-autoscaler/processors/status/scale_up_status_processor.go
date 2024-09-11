@@ -17,8 +17,8 @@ limitations under the License.
 package status
 
 import (
-	"sort"
 	"fmt"
+	"sort"
 	"strings"
 
 	apiv1 "k8s.io/api/core/v1"
@@ -112,18 +112,23 @@ func UpdateScaleUpError(s *ScaleUpStatus, err errors.AutoscalerError) (*ScaleUpS
 }
 
 type combinedStatusSet struct {
-	ScaleupErrors map[*errors.AutoscalerError]bool
-	ScaleUpInfosSet map[nodegroupset.ScaleUpInfo]bool
-	PodsTriggeredScaleUpSet map[*apiv1.Pod]bool
-	PodsRemainUnschedulableSet map[*NoScaleUpInfo]bool
-	PodsAwaitEvaluationSet map[*apiv1.Pod]bool
-	CreateNodeGroupResultsSet map[*nodegroups.CreateNodeGroupResult]bool
-	ConsideredNodeGroupsSet map[cloudprovider.NodeGroup]bool
+	Result                      ScaleUpResult
+	ScaleupErrors               map[*errors.AutoscalerError]bool
+	ScaleUpInfosSet             map[nodegroupset.ScaleUpInfo]bool
+	PodsTriggeredScaleUpSet     map[*apiv1.Pod]bool
+	PodsRemainUnschedulableSet  map[*NoScaleUpInfo]bool
+	PodsAwaitEvaluationSet      map[*apiv1.Pod]bool
+	CreateNodeGroupResultsSet   map[*nodegroups.CreateNodeGroupResult]bool
+	ConsideredNodeGroupsSet     map[cloudprovider.NodeGroup]bool
 	FailedCreationNodeGroupsSet map[cloudprovider.NodeGroup]bool
-	FailedResizeNodeGroupsSet map[cloudprovider.NodeGroup]bool
+	FailedResizeNodeGroupsSet   map[cloudprovider.NodeGroup]bool
 }
 
 func (c *combinedStatusSet) Add(status *ScaleUpStatus) {
+	// This relies on the fact that the ScaleUpResult enum is ordered in a way that the higher the value, the worse the result. This way we can just take the minimum of the results. If new results are added, either the enum should be updated keeping the order, or a different approach should be used to combine the results.
+	if c.Result > status.Result {
+		c.Result = status.Result
+	}
 	if status.ScaleUpError != nil {
 		if _, found := c.ScaleupErrors[status.ScaleUpError]; !found {
 			c.ScaleupErrors[status.ScaleUpError] = true
@@ -186,67 +191,6 @@ func (c *combinedStatusSet) Add(status *ScaleUpStatus) {
 		}
 	}
 }
-
-/*
-func combineConcurrentScaleUpErrors(errs []errors.AutoscalerError) errors.AutoscalerError {
-	if len(errs) == 0 {
-		return nil
-	}
-	if len(errs) == 1 {
-		return errs[0]
-	}
-	uniqueMessages := make(map[string]bool)
-	uniqueTypes := make(map[errors.AutoscalerErrorType]bool)
-	for _, err := range errs {
-		uniqueTypes[err.Type()] = true
-		uniqueMessages[err.Error()] = true
-	}
-	if len(uniqueTypes) == 1 && len(uniqueMessages) == 1 {
-		return errs[0]
-	}
-	// sort to stabilize the results and easier log aggregation
-	sort.Slice(errs, func(i, j int) bool {
-		errA := errs[i]
-		errB := errs[j]
-		if errA.Type() == errB.Type() {
-			return errs[i].Error() < errs[j].Error()
-		}
-		return errA.Type() < errB.Type()
-	})
-	firstErr := errs[0]
-	printErrorTypes := len(uniqueTypes) > 1
-	message := formatMessageFromConcurrentErrors(errs, printErrorTypes)
-	return errors.NewAutoscalerError(firstErr.Type(), message)
-}
-
-func formatMessageFromConcurrentErrors(errs []errors.AutoscalerError, printErrorTypes bool) string {
-	firstErr := errs[0]
-	var builder strings.Builder
-	builder.WriteString(firstErr.Error())
-	builder.WriteString(" ...and other concurrent errors: [")
-	formattedErrs := map[errors.AutoscalerError]bool{
-		firstErr: true,
-	}
-	for _, err := range errs {
-		if _, has := formattedErrs[err]; has {
-			continue
-		}
-		formattedErrs[err] = true
-		var message string
-		if printErrorTypes {
-			message = fmt.Sprintf("[%s] %s", err.Type(), err.Error())
-		} else {
-			message = err.Error()
-		}
-		if len(formattedErrs) > 2 {
-			builder.WriteString(", ")
-		}
-		builder.WriteString(fmt.Sprintf("%q", message))
-	}
-	builder.WriteString("]")
-	return builder.String()
-}
-*/
 
 func (c *combinedStatusSet) formatMessageFromBatchErrors(errs []errors.AutoscalerError, printErrorTypes bool) string {
 	firstErr := errs[0]
@@ -311,14 +255,15 @@ func (c *combinedStatusSet) combineBatchScaleUpErrors() *errors.AutoscalerError 
 	})
 	firstErr := errs[0]
 	printErrorTypes := len(uniqueTypes) > 1
-	message := formatMessageFromConcurrentErrors(errs, printErrorTypes)
-	return errors.NewAutoscalerError(firstErr.Type(), message)
+	message := c.formatMessageFromBatchErrors(errs, printErrorTypes)
+	combinedErr := errors.NewAutoscalerError(firstErr.Type(), message)
+	return &combinedErr
 }
 
 func (c *combinedStatusSet) Export() *ScaleUpStatus {
-	result := &ScaleUpStatus{}
+	result := &ScaleUpStatus{Result: c.Result}
 	if len(c.ScaleupErrors) > 0 {
-		result.ScaleUpError = c.ScaleupErrors
+		result.ScaleUpError = c.combineBatchScaleUpErrors()
 	}
 	if len(c.ScaleUpInfosSet) > 0 {
 		for scaleUpInfo := range c.ScaleUpInfosSet {
@@ -365,14 +310,14 @@ func (c *combinedStatusSet) Export() *ScaleUpStatus {
 
 func NewCombinedStatusSet() combinedStatusSet {
 	return combinedStatusSet{
-		ScaleupErrors: make(map[*errors.AutoscalerError]bool),
-		ScaleUpInfosSet: make(map[nodegroupset.ScaleUpInfo]bool),
-		PodsTriggeredScaleUpSet: make(map[*apiv1.Pod]bool),
-		PodsRemainUnschedulableSet: make(map[*NoScaleUpInfo]bool),
-		PodsAwaitEvaluationSet: make(map[*apiv1.Pod]bool),
-		CreateNodeGroupResultsSet: make(map[*nodegroups.CreateNodeGroupResult]bool),
-		ConsideredNodeGroupsSet: make(map[cloudprovider.NodeGroup]bool),
+		ScaleupErrors:               make(map[*errors.AutoscalerError]bool),
+		ScaleUpInfosSet:             make(map[nodegroupset.ScaleUpInfo]bool),
+		PodsTriggeredScaleUpSet:     make(map[*apiv1.Pod]bool),
+		PodsRemainUnschedulableSet:  make(map[*NoScaleUpInfo]bool),
+		PodsAwaitEvaluationSet:      make(map[*apiv1.Pod]bool),
+		CreateNodeGroupResultsSet:   make(map[*nodegroups.CreateNodeGroupResult]bool),
+		ConsideredNodeGroupsSet:     make(map[cloudprovider.NodeGroup]bool),
 		FailedCreationNodeGroupsSet: make(map[cloudprovider.NodeGroup]bool),
-		FailedResizeNodeGroupsSet: make(map[cloudprovider.NodeGroup]bool),
+		FailedResizeNodeGroupsSet:   make(map[cloudprovider.NodeGroup]bool),
 	}
 }

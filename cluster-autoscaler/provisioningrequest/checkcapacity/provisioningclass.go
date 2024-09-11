@@ -103,9 +103,11 @@ func (o *checkCapacityProvClass) Provision(
 			return status.UpdateScaleUpError(&status.ScaleUpStatus{}, errors.NewAutoscalerError(errors.InternalError, "error during ScaleUp: %s", err.Error()))
 		}
 		if scaleUpIsSuccessful {
-			combinedStatus = append(combinedStatus, &status.ScaleUpStatus{Result: status.ScaleUpSuccessful})
+			// combinedStatus = append(combinedStatus, &status.ScaleUpStatus{Result: status.ScaleUpSuccessful})
+			combinedStatus.Add(&status.ScaleUpStatus{Result: status.ScaleUpSuccessful})
 		} else {
-			combinedStatus = append(combinedStatus, &status.ScaleUpStatus{Result: status.ScaleUpNoOptionsAvailable})
+			// combinedStatus = append(combinedStatus, &status.ScaleUpStatus{Result: status.ScaleUpNoOptionsAvailable})
+			combinedStatus.Add(&status.ScaleUpStatus{Result: status.ScaleUpNoOptionsAvailable})
 		}
 
 		if !o.batchProcessing {
@@ -138,11 +140,11 @@ func (o *checkCapacityProvClass) Provision(
 		}
 	}
 
-	if len(combinedStatus) == 0 {
-		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
-	}
+	// if len(combinedStatus) == 0 {
+	// 	return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
+	// }
 
-	return combinedStatus[len(combinedStatus) - 1], nil
+	return combinedStatus.Export(), nil
 }
 
 // Assuming that all unschedulable pods comes from one ProvisioningRequest.
