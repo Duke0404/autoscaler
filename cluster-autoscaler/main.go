@@ -278,6 +278,7 @@ var (
 	asyncNodeGroupsEnabled                 = flag.Bool("async-node-groups", false, "Whether clusterautoscaler creates and deletes node groups asynchronously. Experimental: requires cloud provider supporting async node group operations, enable at your own risk.")
 	proactiveScaleupEnabled                = flag.Bool("enable-proactive-scaleup", false, "Whether to enable/disable proactive scale-ups, defaults to false")
 	podInjectionLimit                      = flag.Int("pod-injection-limit", 5000, "Limits total number of pods while injecting fake pods. If unschedulable pods already exceeds the limit, pod injection is disabled but pods are not truncated.")
+	podShardingEnabled                     = flag.Bool("pod-sharding", false, "Enable sharding of pending pods into groups to be handled separately by scale-up algorithm")
 )
 
 func isFlagPassed(name string) bool {
@@ -510,6 +511,14 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 	opts.Processors = ca_processors.DefaultProcessors(autoscalingOptions)
 	opts.Processors.TemplateNodeInfoProvider = nodeinfosprovider.NewDefaultTemplateNodeInfoProvider(nodeInfoCacheExpireTime, *forceDaemonSets)
 	podListProcessor := podlistprocessor.NewDefaultPodListProcessor(opts.PredicateChecker, scheduling.ScheduleAnywhere)
+
+	// Add pod sharding related processors if pod sharding is enabled.
+	if *podShardingEnabled {
+		klog.Info("Pod sharding is enabled")
+
+		
+		// TODO: Add pod sharding related processors.
+	}
 
 	if autoscalingOptions.ProvisioningRequestEnabled {
 		podListProcessor.AddProcessor(provreq.NewProvisioningRequestPodsFilter(provreq.NewDefautlEventManager()))
