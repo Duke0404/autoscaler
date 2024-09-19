@@ -4,11 +4,11 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/gpu"
-	gkelabels "k8s.io/gke-autoscaling/cluster-autoscaler/pkg/cloudprovider/gke/labels"
-	"k8s.io/gke-autoscaling/cluster-autoscaler/pkg/cloudprovider/gke/machinetypes"
-	gketpu "k8s.io/gke-autoscaling/cluster-autoscaler/pkg/cloudprovider/gke/tpu"
-	"k8s.io/gke-autoscaling/cluster-autoscaler/pkg/podrequirements"
-	"k8s.io/gke-autoscaling/cluster-autoscaler/pkg/provisioningrequests/queuedwrapper"
+	// gkelabels "k8s.io/gke-autoscaling/cluster-autoscaler/pkg/cloudprovider/gke/labels"
+	// "k8s.io/gke-autoscaling/cluster-autoscaler/pkg/cloudprovider/gke/machinetypes"
+	// gketpu "k8s.io/gke-autoscaling/cluster-autoscaler/pkg/cloudprovider/gke/tpu"
+	// "k8s.io/gke-autoscaling/cluster-autoscaler/pkg/podrequirements"
+	"k8s.io/autoscaler/cluster-autoscaler/utils/podrequirements"
 	klog "k8s.io/klog/v2"
 )
 
