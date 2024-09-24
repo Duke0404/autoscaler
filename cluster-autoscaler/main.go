@@ -75,6 +75,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/drainability/rules"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/options"
 	kube_util "k8s.io/autoscaler/cluster-autoscaler/utils/kubernetes"
+	"k8s.io/autoscaler/cluster-autoscaler/utils/podsharding"
 	scheduler_util "k8s.io/autoscaler/cluster-autoscaler/utils/scheduler"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/units"
 	"k8s.io/autoscaler/cluster-autoscaler/version"
@@ -454,6 +455,7 @@ func createAutoscalingOptions() config.AutoscalingOptions {
 		ProvisioningRequestInitialBackoffTime:   *provisioningRequestInitialBackoffTime,
 		ProvisioningRequestMaxBackoffTime:       *provisioningRequestMaxBackoffTime,
 		ProvisioningRequestMaxBackoffCacheSize:  *provisioningRequestMaxBackoffCacheSize,
+		PodShardingEnabled: 					 *podShardingEnabled,
 	}
 }
 
@@ -518,6 +520,13 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 
 		
 		// TODO: Add pod sharding related processors.
+	}
+
+	if autoscalingOptions.PodShardingEnabled {
+		klog.Info("Pod sharding is enabled")
+		podsharder := podsharding.NewOssPodSharder(autoscalingOptions.ProvisioningRequestEnabled)
+		podshardselector := podsharding.NewLruPodShardSelector()
+		podShardFilter := podsharding.NewPredicatePodShardFilter()
 	}
 
 	if autoscalingOptions.ProvisioningRequestEnabled {

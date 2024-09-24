@@ -5,7 +5,7 @@ import (
 	pr_pods "k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/pods"
 )
 
-func NewPodSharder(provisioningRequestsEnabled bool) PodSharder {
+func NewOssPodSharder(provisioningRequestsEnabled bool) PodSharder {
 	computeFunctions := []FeatureShardComputeFunction{}
 
 	if provisioningRequestsEnabled {
