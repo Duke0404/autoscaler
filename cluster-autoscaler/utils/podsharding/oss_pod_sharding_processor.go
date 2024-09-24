@@ -8,8 +8,7 @@ import (
 )
 
 const (
-	selectPodShardContextKey                = "selected-pod-shard.podsharding.gke-autoscaler"
-	unschedulablePodsZoneAgnosticContextKey = "unschedulable-pods-zone-agnostic.podsharding.gke-autoscaler"
+	selectPodShardContextKey = "selected-pod-shard.podsharding.cluster-autoscaler"
 )
 
 // PodShardingProcessor is a GKE specific processor for pre-sharding unschedulable pods. It uses given PodSharder
@@ -32,20 +31,6 @@ func GetSelectedPodShard(context *context.AutoscalingContext) *PodShard {
 		return nil
 	}
 	return shard
-}
-
-// AreUnschedulablePodsZoneAgnostic returns if unschedulable pods are zone agnostic
-func AreUnschedulablePodsZoneAgnostic(context *context.AutoscalingContext) bool {
-	value, found := context.ProcessorCallbacks.GetExtraValue(unschedulablePodsZoneAgnosticContextKey)
-	if !found {
-		return false
-	}
-	zoneAgnostic, ok := value.(bool)
-	if !ok {
-		klog.Errorf("Expected bool as value for %v; got %T", unschedulablePodsZoneAgnosticContextKey, value)
-		return false
-	}
-	return zoneAgnostic
 }
 
 // NewPodShardingProcessor creates new instance of GKE specific PodShardingProcessor
@@ -82,11 +67,10 @@ func (p *PodShardingProcessor) Process(context *context.AutoscalingContext,
 	if err != nil {
 		return []*apiv1.Pod{}, errors.ToAutoscalerError(errors.InternalError, err)
 	}
-	klog.Infof("Selected pods shard %v; NodeGroupDescriptor=%#v; shardPodsCount=%v; extendedPodsCount=%v; zoneAgnostic=%v",
-		podShard.Signature(), podShard.NodeGroupDescriptor, len(podShard.PodUids), len(filteringResult.Pods), filteringResult.ZoneAgnostic)
+	klog.Infof("Selected pods shard %v; NodeGroupDescriptor=%#v; shardPodsCount=%v; extendedPodsCount=%v",
+		podShard.Signature(), podShard.NodeGroupDescriptor, len(podShard.PodUids), len(filteringResult.Pods))
 
 	context.ProcessorCallbacks.SetExtraValue(selectPodShardContextKey, podShard)
-	context.ProcessorCallbacks.SetExtraValue(unschedulablePodsZoneAgnosticContextKey, filteringResult.ZoneAgnostic)
 
 	return filteringResult.Pods, nil
 }

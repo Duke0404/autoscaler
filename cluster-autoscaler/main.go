@@ -515,13 +515,6 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 	podListProcessor := podlistprocessor.NewDefaultPodListProcessor(opts.PredicateChecker, scheduling.ScheduleAnywhere)
 
 	// Add pod sharding related processors if pod sharding is enabled.
-	if *podShardingEnabled {
-		klog.Info("Pod sharding is enabled")
-
-		
-		// TODO: Add pod sharding related processors.
-	}
-
 	if autoscalingOptions.PodShardingEnabled {
 		klog.Info("Pod sharding is enabled")
 		podsharder := podsharding.NewOssPodSharder(autoscalingOptions.ProvisioningRequestEnabled)

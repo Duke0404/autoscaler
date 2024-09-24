@@ -6,7 +6,12 @@ import (
 )
 
 func NewOssPodSharder(provisioningRequestsEnabled bool) PodSharder {
-	computeFunctions := []FeatureShardComputeFunction{}
+	computeFunctions := []FeatureShardComputeFunction{
+		{
+			"label_name",
+			labelNameShard,
+		},
+	}
 
 	if provisioningRequestsEnabled {
 		computeFunctions = append(computeFunctions, FeatureShardComputeFunction{
@@ -16,6 +21,10 @@ func NewOssPodSharder(provisioningRequestsEnabled bool) PodSharder {
 	}
 
 	return NewCompositePodSharder(computeFunctions)
+}
+
+func labelNameShard(pod *v1.Pod, nodeGroupDescriptor *NodeGroupDescriptor) {
+	nodeGroupDescriptor.Labels = pod.Labels
 }
 
 func provisioningRequestShard(pod *v1.Pod, nodeGroupDescriptor *NodeGroupDescriptor) {

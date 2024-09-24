@@ -5,7 +5,7 @@ import (
 	apitypes "k8s.io/apimachinery/pkg/types"
 )
 
-// FeatureShardComputeFunction function computes part of shard to which pod belongs, looking at specific feature (workload separation, gpu usage, ...).
+// FeatureShardComputeFunction function computes part of shard to which pod belongs, looking at specific feature.
 // If function does not detect that pod should be separated from others based on handled feature it should return empty string
 type FeatureShardComputeFunction struct {
 	// Feature is feature name

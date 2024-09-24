@@ -114,9 +114,6 @@ type PodSharder interface {
 type PodFilteringResult struct {
 	// Pods is the result of filtering
 	Pods []*apiv1.Pod
-	// ZoneAgnostic is set to true if filtering process showed that pod specs are zone agnostic. The same set of pods
-	// pass predicates for test node built for each of the zones.
-	ZoneAgnostic bool
 }
 
 // PodShardFilter filters pod list against PodShard
