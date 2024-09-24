@@ -280,6 +280,7 @@ var (
 	proactiveScaleupEnabled                = flag.Bool("enable-proactive-scaleup", false, "Whether to enable/disable proactive scale-ups, defaults to false")
 	podInjectionLimit                      = flag.Int("pod-injection-limit", 5000, "Limits total number of pods while injecting fake pods. If unschedulable pods already exceeds the limit, pod injection is disabled but pods are not truncated.")
 	podShardingEnabled                     = flag.Bool("pod-sharding", false, "Enable sharding of pending pods into groups to be handled separately by scale-up algorithm")
+	podShardingLabel                       = multiStringFlag("pod-sharding-label", "Label to use for sharding pods. Can be used multiple times.")
 )
 
 func isFlagPassed(name string) bool {
@@ -456,6 +457,7 @@ func createAutoscalingOptions() config.AutoscalingOptions {
 		ProvisioningRequestMaxBackoffTime:       *provisioningRequestMaxBackoffTime,
 		ProvisioningRequestMaxBackoffCacheSize:  *provisioningRequestMaxBackoffCacheSize,
 		PodShardingEnabled: 					 *podShardingEnabled,
+		PodShardingLabels:                       *podShardingLabel,
 	}
 }
 
@@ -517,7 +519,19 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 	// Add pod sharding related processors if pod sharding is enabled.
 	if autoscalingOptions.PodShardingEnabled {
 		klog.Info("Pod sharding is enabled")
-		podsharder := podsharding.NewOssPodSharder(autoscalingOptions.ProvisioningRequestEnabled)
+
+		podShardingLabels := make(map[string]string)
+		for _, label := range autoscalingOptions.PodShardingLabels {
+			parts := strings.Split(label, "=")
+			if len(parts) != 2 {
+				klog.Errorf("Invalid pod sharding label: %s", label)
+				continue
+			}
+			
+			podShardingLabels[parts[0]] = parts[1]
+		}
+
+		podsharder := podsharding.NewOssPodSharder(autoscalingOptions.ProvisioningRequestEnabled, podShardingLabels)
 		podshardselector := podsharding.NewLruPodShardSelector()
 		podShardFilter := podsharding.NewPredicatePodShardFilter()
 		podShardingProcessor := podsharding.NewPodShardingProcessor(podsharder, podshardselector, podShardFilter)

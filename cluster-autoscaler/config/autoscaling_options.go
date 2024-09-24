@@ -303,6 +303,8 @@ type AutoscalingOptions struct {
 	ProvisioningRequestMaxBackoffCacheSize int
 	// PodShardingEnabled indicates if pod sharding is enabled
 	PodShardingEnabled bool
+	// PodShardingLabels is a list of labels to use when comparing if two node groups are similar for pod sharding.
+	PodShardingLabels []string
 }
 
 // KubeClientOptions specify options for kube client

@@ -1,11 +1,13 @@
 package podsharding
 
 import (
+	"maps"
+
 	v1 "k8s.io/api/core/v1"
 	pr_pods "k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/pods"
 )
 
-func NewOssPodSharder(provisioningRequestsEnabled bool) PodSharder {
+func NewOssPodSharder(provisioningRequestsEnabled bool, podShardingLabels map[string]string) PodSharder {
 	computeFunctions := []FeatureShardComputeFunction{
 		{
 			"label_name",
@@ -24,7 +26,7 @@ func NewOssPodSharder(provisioningRequestsEnabled bool) PodSharder {
 }
 
 func labelNameShard(pod *v1.Pod, nodeGroupDescriptor *NodeGroupDescriptor) {
-	nodeGroupDescriptor.Labels = pod.Labels
+	maps.Copy(nodeGroupDescriptor.Labels, pod.Labels)
 }
 
 func provisioningRequestShard(pod *v1.Pod, nodeGroupDescriptor *NodeGroupDescriptor) {
