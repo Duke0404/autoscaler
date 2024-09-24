@@ -527,6 +527,8 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 		podsharder := podsharding.NewOssPodSharder(autoscalingOptions.ProvisioningRequestEnabled)
 		podshardselector := podsharding.NewLruPodShardSelector()
 		podShardFilter := podsharding.NewPredicatePodShardFilter()
+		podShardingProcessor := podsharding.NewPodShardingProcessor(podsharder, podshardselector, podShardFilter)
+		podListProcessor.AddProcessor(podShardingProcessor)
 	}
 
 	if autoscalingOptions.ProvisioningRequestEnabled {
