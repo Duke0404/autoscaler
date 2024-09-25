@@ -456,8 +456,8 @@ func createAutoscalingOptions() config.AutoscalingOptions {
 		ProvisioningRequestInitialBackoffTime:   *provisioningRequestInitialBackoffTime,
 		ProvisioningRequestMaxBackoffTime:       *provisioningRequestMaxBackoffTime,
 		ProvisioningRequestMaxBackoffCacheSize:  *provisioningRequestMaxBackoffCacheSize,
-		PodShardingEnabled: 					 *podShardingEnabled,
-		PodShardingNodeSelectors:                       *podShardingNodeSelector,
+		PodShardingEnabled:                      *podShardingEnabled,
+		PodShardingNodeSelectors:                *podShardingNodeSelector,
 	}
 }
 
