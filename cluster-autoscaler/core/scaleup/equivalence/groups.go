@@ -26,6 +26,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/processors/status"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/drain"
 	pod_utils "k8s.io/autoscaler/cluster-autoscaler/utils/pod"
+	
 )
 
 // PodGroup contains a group of pods that are equivalent in terms of schedulability.
@@ -53,6 +54,15 @@ type equivalenceGroupId int
 type equivalenceGroup struct {
 	id           equivalenceGroupId
 	representant *apiv1.Pod
+}
+
+// PodsFromPodGroup returns all pods from the equivalence group.
+func PodsFromPodGroup(podGroups []*PodGroup) []*apiv1.Pod {
+	var pods []*apiv1.Pod
+	for _, podGroup := range podGroups {
+		pods = append(pods, podGroup.Pods...)
+	}
+	return pods
 }
 
 const maxEquivalenceGroupsByController = 10

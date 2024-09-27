@@ -72,6 +72,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/drainability/rules"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/options"
 	kube_util "k8s.io/autoscaler/cluster-autoscaler/utils/kubernetes"
+	"k8s.io/autoscaler/cluster-autoscaler/utils/podsharding"
 	scheduler_util "k8s.io/autoscaler/cluster-autoscaler/utils/scheduler"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/units"
 	"k8s.io/autoscaler/cluster-autoscaler/version"
@@ -267,14 +268,18 @@ var (
 			"--max-graceful-termination-sec flag should not be set when this flag is set. Not setting this flag will use unordered evictor by default."+
 			"Priority evictor reuses the concepts of drain logic in kubelet(https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/2712-pod-priority-based-graceful-node-shutdown#migration-from-the-node-graceful-shutdown-feature)."+
 			"Eg. flag usage:  '10000:20,1000:100,0:60'")
-	provisioningRequestsEnabled            = flag.Bool("enable-provisioning-requests", false, "Whether the clusterautoscaler will be handling the ProvisioningRequest CRs.")
-	provisioningRequestInitialBackoffTime  = flag.Duration("provisioning-request-initial-backoff-time", 1*time.Minute, "Initial backoff time for ProvisioningRequest retry after failed ScaleUp.")
-	provisioningRequestMaxBackoffTime      = flag.Duration("provisioning-request-max-backoff-time", 10*time.Minute, "Max backoff time for ProvisioningRequest retry after failed ScaleUp.")
-	provisioningRequestMaxBackoffCacheSize = flag.Int("provisioning-request-max-backoff-cache-size", 1000, "Max size for ProvisioningRequest cache size used for retry backoff mechanism.")
-	frequentLoopsEnabled                   = flag.Bool("frequent-loops-enabled", false, "Whether clusterautoscaler triggers new iterations more frequently when it's needed")
-	asyncNodeGroupsEnabled                 = flag.Bool("async-node-groups", false, "Whether clusterautoscaler creates and deletes node groups asynchronously. Experimental: requires cloud provider supporting async node group operations, enable at your own risk.")
-	proactiveScaleupEnabled                = flag.Bool("enable-proactive-scaleup", false, "Whether to enable/disable proactive scale-ups, defaults to false")
-	podInjectionLimit                      = flag.Int("pod-injection-limit", 5000, "Limits total number of pods while injecting fake pods. If unschedulable pods already exceeds the limit, pod injection is disabled but pods are not truncated.")
+	provisioningRequestsEnabled                                          = flag.Bool("enable-provisioning-requests", false, "Whether the clusterautoscaler will be handling the ProvisioningRequest CRs.")
+	provisioningRequestInitialBackoffTime                                = flag.Duration("provisioning-request-initial-backoff-time", 1*time.Minute, "Initial backoff time for ProvisioningRequest retry after failed ScaleUp.")
+	provisioningRequestMaxBackoffTime                                    = flag.Duration("provisioning-request-max-backoff-time", 10*time.Minute, "Max backoff time for ProvisioningRequest retry after failed ScaleUp.")
+	provisioningRequestMaxBackoffCacheSize                               = flag.Int("provisioning-request-max-backoff-cache-size", 1000, "Max size for ProvisioningRequest cache size used for retry backoff mechanism.")
+	frequentLoopsEnabled                                                 = flag.Bool("frequent-loops-enabled", false, "Whether clusterautoscaler triggers new iterations more frequently when it's needed")
+	asyncNodeGroupsEnabled                                               = flag.Bool("async-node-groups", false, "Whether clusterautoscaler creates and deletes node groups asynchronously. Experimental: requires cloud provider supporting async node group operations, enable at your own risk.")
+	proactiveScaleupEnabled                                              = flag.Bool("enable-proactive-scaleup", false, "Whether to enable/disable proactive scale-ups, defaults to false")
+	podInjectionLimit                                                    = flag.Int("pod-injection-limit", 5000, "Limits total number of pods while injecting fake pods. If unschedulable pods already exceeds the limit, pod injection is disabled but pods are not truncated.")
+	podShardingEnabled                                                   = flag.Bool("pod-sharding", false, "Enable sharding of pending pods into groups to be handled separately by scale-up algorithm")
+	podShardingNodeSelector                                              = multiStringFlag("pod-sharding-node-selector", "Label to use for sharding pods. Can be used multiple times.")
+	bestEffortAtomicProvisioningRequestShardedMaxInjectionQuantity       = flag.Int("best-effort-atomic-provisioning-request-sharded-max-injection-quantity", 10, "Maximum number of BestEffortAtomic ProvisioningRequests to inject in a single iteration when pod sharding is enabled.")
+	bestEffortAtomicProvisioningRequestShardedSimulationTimebox          = flag.Duration("best-effort-atomic-provisioning-request-sharded-simulation-timebox", 30*time.Second, "Maximum time to spend on simulation of best effort atomic ProvisioningRequests' pods in a single iteration.")
 )
 
 func isFlagPassed(name string) bool {
@@ -443,13 +448,17 @@ func createAutoscalingOptions() config.AutoscalingOptions {
 			MaxAllocatableDifferenceRatio:    *maxAllocatableDifferenceRatio,
 			MaxFreeDifferenceRatio:           *maxFreeDifferenceRatio,
 		},
-		DynamicNodeDeleteDelayAfterTaintEnabled: *dynamicNodeDeleteDelayAfterTaintEnabled,
-		BypassedSchedulers:                      scheduler_util.GetBypassedSchedulersMap(*bypassedSchedulers),
-		ProvisioningRequestEnabled:              *provisioningRequestsEnabled,
-		AsyncNodeGroupsEnabled:                  *asyncNodeGroupsEnabled,
-		ProvisioningRequestInitialBackoffTime:   *provisioningRequestInitialBackoffTime,
-		ProvisioningRequestMaxBackoffTime:       *provisioningRequestMaxBackoffTime,
-		ProvisioningRequestMaxBackoffCacheSize:  *provisioningRequestMaxBackoffCacheSize,
+		DynamicNodeDeleteDelayAfterTaintEnabled:                              *dynamicNodeDeleteDelayAfterTaintEnabled,
+		BypassedSchedulers:                                                   scheduler_util.GetBypassedSchedulersMap(*bypassedSchedulers),
+		ProvisioningRequestEnabled:                                           *provisioningRequestsEnabled,
+		AsyncNodeGroupsEnabled:                                               *asyncNodeGroupsEnabled,
+		ProvisioningRequestInitialBackoffTime:                                *provisioningRequestInitialBackoffTime,
+		ProvisioningRequestMaxBackoffTime:                                    *provisioningRequestMaxBackoffTime,
+		ProvisioningRequestMaxBackoffCacheSize:                               *provisioningRequestMaxBackoffCacheSize,
+		PodShardingEnabled:                                                   *podShardingEnabled,
+		PodShardingNodeSelectors:                                             *podShardingNodeSelector,
+		BestEffortAtomicProvisioningRequestShardedMaxInjectionQuantity:       *bestEffortAtomicProvisioningRequestShardedMaxInjectionQuantity,
+		BestEffortAtomicProvisioningRequestShardedSimulationTimebox:          *bestEffortAtomicProvisioningRequestShardedSimulationTimebox,
 	}
 }
 
@@ -525,12 +534,39 @@ func buildAutoscaler(debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter
 		opts.ScaleUpOrchestrator = scaleUpOrchestrator
 		provreqProcesor := provreq.NewProvReqProcessor(client, opts.PredicateChecker)
 		opts.LoopStartNotifier = loopstart.NewObserversList([]loopstart.Observer{provreqProcesor})
-		injector, err := provreq.NewProvisioningRequestPodsInjector(restConfig, opts.ProvisioningRequestInitialBackoffTime, opts.ProvisioningRequestMaxBackoffTime, opts.ProvisioningRequestMaxBackoffCacheSize)
+		injector, err := provreq.NewProvisioningRequestPodsInjector(
+			restConfig, opts.ProvisioningRequestInitialBackoffTime,
+			opts.ProvisioningRequestMaxBackoffTime,
+			opts.ProvisioningRequestMaxBackoffCacheSize,
+			opts.PodShardingEnabled,
+			opts.BestEffortAtomicProvisioningRequestShardedMaxInjectionQuantity)
 		if err != nil {
 			return nil, err
 		}
 		podListProcessor.AddProcessor(injector)
 		podListProcessor.AddProcessor(provreqProcesor)
+	}
+
+	// Add pod sharding related processors if pod sharding is enabled.
+	if autoscalingOptions.PodShardingEnabled {
+		klog.Info("Pod sharding is enabled")
+
+		PodShardingNodeSelectors := make(map[string]string)
+		for _, label := range autoscalingOptions.PodShardingNodeSelectors {
+			parts := strings.Split(label, "=")
+			if len(parts) != 2 {
+				klog.Errorf("Invalid pod sharding label: %s", label)
+				continue
+			}
+
+			PodShardingNodeSelectors[parts[0]] = parts[1]
+		}
+
+		podsharder := podsharding.NewOssPodSharder(PodShardingNodeSelectors, autoscalingOptions.ProvisioningRequestEnabled)
+		podshardselector := podsharding.NewLruPodShardSelector()
+		podShardFilter := podsharding.NewPredicatePodShardFilter()
+		podShardingProcessor := podsharding.NewPodShardingProcessor(podsharder, podshardselector, podShardFilter)
+		podListProcessor.AddProcessor(podShardingProcessor)
 	}
 
 	if *proactiveScaleupEnabled {

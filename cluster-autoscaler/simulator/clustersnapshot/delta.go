@@ -475,3 +475,22 @@ func (snapshot *DeltaClusterSnapshot) Commit() error {
 func (snapshot *DeltaClusterSnapshot) Clear() {
 	snapshot.data = newInternalDeltaSnapshotData()
 }
+
+// Export returns a shallow copy of the changes made to the snapshot.
+// Time: O(1) (shallow copy)
+func (base *DeltaClusterSnapshot) Export() ClusterSnapshot {
+	return &DeltaClusterSnapshot{
+		data: base.data,
+	}
+}
+
+// Rebase rebases the snapshot to a new base snapshot.
+// Time: O(1)
+func (snapshot *DeltaClusterSnapshot) Rebase(base ClusterSnapshot) error {
+	snapshotBase, ok := base.(*DeltaClusterSnapshot)
+	if !ok {
+		return fmt.Errorf("cannot rebase to a different type of snapshot")
+	}
+	snapshot.data.baseData = snapshotBase.data
+	return nil
+}
